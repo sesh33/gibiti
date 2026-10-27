@@ -1,53 +1,45 @@
-# Implementation status and acceptance evidence
+# RIVOX Control — verified delivery status
 
-## Phase 1 — Foundation
+## Working and validated
 
-Implemented: pinned Next.js/React dependencies and lockfile, strict TypeScript, Tailwind, Radix/shadcn-style UI primitives, domain separation, Supabase server/admin clients, validated auth routes, refresh proxy, MFA gates, backend RBAC, SQL RLS, versioned migrations, error handling, structured redacted error logging.
+The application now runs against a real isolated local Supabase stack: PostgreSQL 17, GoTrue Auth, PostgREST and a local Mailpit receiver. This is real authentication and SQL/RLS, not a mock auth service. All migrations apply automatically through `npm run local`.
 
-Locally validated: type checking, production build, Vitest SQL/security/integration tests, real PostgreSQL 17 migration/policy/concurrency smoke check, and Chromium workspace navigation/responsiveness. Production dependency audit reported zero known advisories at the time it was run.
+The real browser workflow validated:
 
-Not yet validated: hosted Supabase schema, real Auth/MFA flows, actual invitation emails, live session renewal, Vercel deployment, backup/restore, production monitoring. The project URL was supplied; runtime keys were absent at the last presence check. A request to the project auth settings URL was denied by the current proxy (403 tunnel denial).
+- Explicit first Owner creation via private loopback-only setup, password authentication and real MFA enrollment/verification. The generated QR was decoded as a real authenticator QR, and a valid TOTP code was accepted.
+- Official Eldorado token acquisition and **8 real orders** read and persisted. Real order details, chronological state history and internal notes work. .NET GUIDs, nullable listing titles, timestamp offsets and PostgREST unique-relation shapes are normalized correctly.
+- **3 real listing categories** read and persisted: flexible, predefined and items. Local filtering/pagination are implemented. Currency requires further official request-contract verification; it returned HTTP 415 with the default request and HTTP 400 with JSON media type.
+- Owner staff invitations delivered to local Mailpit, accepted from the actual email link, and password setup completed in the browser.
+- A support employee initially sees no unassigned orders, gains access after assignment, cannot manage the team or request unauthorized cancellation, and loses access immediately after session revocation.
+- Custom roles with granular overrides, independently MFA-reviewed assignment, visible custom labels, idempotent requests and revoked old sessions.
+- Audited internal inventory creation, reservations, duplicate-allocation rejection, releases, and consumption only after a distinct reviewer approves it. No corresponding Eldorado order status was changed.
+- Approval intent, duplicate-request handling, self-approval rejection, audit access, real per-currency analytics, and sign-out.
 
-## Phase 2 — Integration
+The standalone local real-auth workflow passed **19 checks**. Synthetic local staff/stock/notes/approval test records were removed afterwards. Real read-only order/listing snapshots remain in the local database; no fixture accounts or passwords are shipped.
 
-Implemented: backend token management, validated/sanitized first-page order read, atomic local persistence, local cursor pagination, periodic refresh and error records. The official cursor request parameter is configurable only after verification; it is not guessed by default.
+## External integrations actually checked
 
-Pending: live credentials/read validation, complete upstream cursor contract verification, historical catch-up/checkpoint strategy, official offer response/payload verification, live offer adapter.
+| Service                 | Verified evidence                                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hosted Supabase project | Public Auth settings HTTP 200; service-role Auth administration HTTP 200; no existing Auth users; RIVOX tables absent (PGRST205).                          |
+| Local Supabase          | All services healthy without ignoring health checks; migrations, real passwords, JWT/cookies, MFA, RLS, invitation email flow and operations validated.    |
+| Eldorado                | Canonical `www.eldorado.gg` seller token POST 200; official order GET 200; flexible/predefined/item offer GETs 200. No real upstream commercial mutation.  |
+| Official messaging      | No authorized read/send contract available. Swagger/support documentation access attempts were denied; no browser cookies or internal endpoints were used. |
+| AI                      | No provider configured, no external processing. Local English reply templates are explicitly labeled templates and require human review.                   |
 
-## Phase 3 — Operation
+Native Node transport now uses the supported environment proxy, preserving TLS and credential routing. Loopback requests bypass that proxy. The canonical seller authentication host is used directly rather than replaying secrets through redirects.
 
-Implemented: Order Center/detail views, notes, assignments, approval requests/decisions, idempotency and uniqueness, audit events. Internal inventory reservations, releases, separately reviewed consumption, and approved employee access changes execute transactionally. Optional delivery data is encrypted, separately permissioned, and audited on access. Stock movements are recorded without changing upstream orders.
+## Remaining external prerequisites
 
-Pending: **real** deliver/cancel/update-delivery execution, fresh official-state/transition validation, post-write verification, durable external-operation recovery/locks, configured review policies for other critical mutations. The official mutation payloads were not supplied and remote Swagger access returned 403; writes are deliberately disabled.
+1. **Hosted database:** API keys do not grant arbitrary SQL execution. No database connection password or Supabase Management API access token was supplied. To use the hosted project, apply the generated reviewed SQL bundle in its SQL Editor (or provide authorized migration access securely), disable public signup, configure SMTP/redirects, and create the intended verified Owner account. No hosted table/user/data was modified during this work.
+2. **Messaging:** Eldorado must supply an authorized messaging contract/SDK access. The Smart Inbox states this clearly; production read/send remain unavailable. Mock messaging is opt-in and rejected in production.
+3. **Commercial writes:** official payload/state-transition contracts plus explicit authorization for a single controlled real operation are still required. Approval records do not execute upstream cancellation/delivery/listing mutations.
+4. **Currency listing pagination/request:** verify the official current request contract. No query/body is invented from response fields. Other returned listing pages report their coverage explicitly.
+5. **AI:** a selected provider and approved privacy settings are required before translation or model-generated suggestions process buyer information. Sending remains a separate human-controlled action.
+6. **Public deployment:** not authorized and not performed. The local launch is reproducible on a machine with Node.js and Docker Desktop.
 
-## Phase 4 — Team
+## Verification commands
 
-Implemented: Owner-confirmed invitations, role/individual permission editor, separate MFA-reviewed access changes, deactivation/session revocation, staff listing, order assignment, access-session records and audit. Supabase SMTP/template setup is documented.
+`npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:e2e`. Local full-stack validation: `RIVOX_SETUP_TOKEN_FILE=<private-path> npm run test:local -- --allow-live-reads` on a fresh local workspace only. Live read tests are opt-in with `RIVOX_LIVE_READS=true` and never send commercial mutations.
 
-Pending: real invitation/MFA/session testing, conversation assignment adapter/UI, team workload/productivity reporting, supervision dashboards, complete access-history UI, failed-invite reconciliation tooling. Permission changes require a distinct eligible reviewer; no bootstrap bypass is available through the public API.
-
-## Phase 5 — Support
-
-Implemented: three-column Smart Inbox, search/filter UI, chronological mock history, controlled compose state, English quick replies, development-provider isolation, linked-order integration boundary. Internal order notes are real database operations once hosted setup is active.
-
-Pending: official authorization and provider contracts, real read/send/attachments, authenticated webhook verification/replay protection, complete assigned/status filters and persistent inbox filters. No real message was read or sent. The module is **not complete**.
-
-## Phase 6 — Intelligence
-
-Implemented: partial-scope counts and per-currency completed-order volume from actual synchronized records. Disconnected metrics remain empty. AI is visibly off and no buyer data is sent to a provider.
-
-Pending: privacy-approved AI provider, summaries/translation/suggestions with human approval, alerts, supported processing-time and team-productivity metrics, complete analytics history.
-
-## Phase 7 — Production
-
-Implemented: build/type/security/database/browser validation, CI workflow and deployment/security documentation.
-
-Pending: staging and real integration acceptance, recovery and operational runbooks exercised, Vercel project binding/deployment, real authentication/permission tests through the Supabase gateway, release review. No public deployment or environment publication was performed by this implementation.
-
-## Next technical steps
-
-1. Save secure Supabase/Eldorado bindings and apply the migrations to staging. Bootstrap the Owner and verify MFA/invitations/permission separation end to end.
-2. Validate one official read and its actual pagination contract; perform historical synchronization with clearly bounded scope.
-3. Obtain official messaging integration access and verified order/offer mutation contracts. Implement adapters only from those contracts.
-4. Obtain explicit authorization for a single controlled live write after staging checks, then implement/validate recovery for ambiguous upstream outcomes.
-5. Complete the pending modules and production acceptance criteria before moving the team into daily operation.
+Unit/integration tests cover proxy-independent contracts, token refresh, privacy gates, cipher integrity, role/default/override consistency, SQL permissions, MFA assurance, session revocation, duplicate operations, approved role snapshots and stock concurrency. Browser tests cover the unconfigured workspace, accessibility and QR rendering; the separate real-auth run supplies integration evidence beyond those UI fixtures.

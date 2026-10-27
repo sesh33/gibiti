@@ -1,6 +1,6 @@
 # Secure deployment and operator setup
 
-This is a release checklist, not a claim that deployment has occurred. No Vercel deployment or hosted database migration has been performed.
+This is a release checklist, not a claim that deployment has occurred. No Vercel deployment or hosted database migration has been performed. For a fully automated local database/Auth setup, use `npm run local` and [the localhost guide](localhost.md).
 
 ## Supabase
 
@@ -8,15 +8,16 @@ This is a release checklist, not a claim that deployment has occurred. No Vercel
 2. Apply all SQL files in `supabase/migrations` in filename order using Supabase CLI migrations or the project's SQL Editor. Do not expose a generic SQL endpoint in the app. Local migration tests do not prove hosted application.
 3. Disable public sign-ups. Only invitations issued by the Owner should create membership. Set a strong password policy, email verification, appropriate Supabase Auth rate limits, session lifetime, and TOTP MFA enrollment/verification. Owner/Admin access is denied until the JWT has `aal2`.
 4. Configure production SMTP and allowed redirect URLs for the exact application origin. No email provider credentials are needed by the app; Supabase handles delivery.
-5. Set the invitation email template link to the supported token-hash confirmation flow:
+5. Set the hosted invitation email template link to the supported fragment-based confirmation flow (the fragment is removed before a same-origin POST, keeping invitation tokens out of app request URLs):
 
    ```html
-   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite"
+   <a
+     href="{{ .SiteURL }}/account/setup#token_hash={{ .TokenHash }}&type=invite"
      >Accept your RIVOX invitation</a
    >
    ```
 
-   Set `.SiteURL` to the exact HTTPS deployment origin. Do not use an implicit access-token-in-URL flow with this server-cookie implementation.
+   Set `.SiteURL` to the exact HTTPS deployment origin. The local Mailpit flow also supports Supabase's standard session fragment after explicit user acceptance; it is converted to verified HTTP-only cookies. The legacy token-hash confirmation route remains compatible.
 
 6. Create and verify the initial Owner Auth user in the Supabase dashboard. Then, in the SQL Editor, call `public.bootstrap_owner` with that user's UUID, email, and display name. This function is executable only by `service_role`/database administrators, succeeds only once, and creates an audit entry. Do not grant it to `authenticated` or `anon`.
 7. Sign in to RIVOX. The Owner is sent to MFA setup, then back to the workspace after verification. Test with a second account before inviting the wider team.
