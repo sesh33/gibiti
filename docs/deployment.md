@@ -58,3 +58,19 @@ Verify actual sign-in, TOTP, invitation delivery, expired/revoked/disabled accou
 Start Eldorado integration with an authorized read. Verify current order response/request contracts and pagination. Verify token refresh under the actual proxy. No delivery, cancellation, listing update, deletion, or bulk mutation should be used as a setup test.
 
 The app must not be called production-ready until the pending contracts, real integration tests, external operation execution/recovery, messaging authorization, and operational controls listed in the status document are resolved.
+
+## Saved keys versus active runtime bindings
+
+A credential stored in environment settings must also be saved and bound to the expected application variable name. A suggested configuration value is not proof that it has reached the running instance.
+
+Check the names and presence only; never dump the process environment or copy credential values into logs/chat. This read-only diagnostic prints booleans:
+
+```sh
+node --input-type=module - <<'JS'
+for (const name of ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_ORIGIN']) {
+  console.log(name + ': ' + Boolean(process.env[name]));
+}
+JS
+```
+
+If bindings are absent, verify the saved variable/secret names and complete saving the environment configuration before rebuilding or testing authentication. Do not rotate or duplicate keys solely because they have not appeared in the instance. A successful unauthenticated request returning HTTP 401 proves network reachability, not successful key authentication or database readiness.

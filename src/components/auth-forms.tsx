@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, LockKeyhole, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
+import { normalizeMfaQrCode } from "@/domains/authentication/mfa-qr";
 export function AuthForm({
   mode,
   configured = true,
@@ -28,11 +29,9 @@ export function AuthForm({
         "/api/auth/mfa",
         { method: "POST", body: JSON.stringify({ action: "setup" }) },
       );
+      const qrCode = data.qrCode ? normalizeMfaQrCode(data.qrCode) : "";
+      setQr(qrCode);
       setFactor(data.factorId);
-      if (data.qrCode)
-        setQr(
-          `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.qrCode)}`,
-        );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to start MFA.");
     } finally {
