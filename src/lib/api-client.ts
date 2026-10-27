@@ -1,0 +1,15 @@
+export async function api<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options?.body ? { "Content-Type": "application/json" } : {}),
+      ...options?.headers,
+    },
+  });
+  const body = await response.json();
+  if (!response.ok)
+    throw new Error(
+      body.error?.message ?? "The request could not be completed.",
+    );
+  return body as T;
+}
