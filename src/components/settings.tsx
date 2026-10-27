@@ -189,9 +189,10 @@ export function Settings({ configured }: { configured: boolean }) {
             </div>
           </div>
           <p>
-            The order's <code>talkJsConversationId</code> is a reference, not a
-            credential. An authorized Eldorado messaging contract or provisioned
-            SDK access is required before reading or sending real messages.
+            The order&apos;s <code>talkJsConversationId</code> is a reference,
+            not a credential. An authorized Eldorado messaging contract or
+            provisioned SDK access is required before reading or sending real
+            messages.
           </p>
           <p>
             Ask Eldorado support whether seller messaging APIs, scoped TalkJS

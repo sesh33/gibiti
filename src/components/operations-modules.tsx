@@ -2,19 +2,7 @@
 import { useState } from "react";
 import { InventoryActions } from "@/components/inventory-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowUpRight,
-  Check,
-  CheckCircle2,
-  Clock3,
-  Copy,
-  Layers3,
-  Plus,
-  ShieldCheck,
-  Users,
-  X,
-} from "lucide-react";
-import Link from "next/link";
+import { Check, Layers3, Plus, ShieldCheck, X } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { money } from "@/lib/utils";
 import {
