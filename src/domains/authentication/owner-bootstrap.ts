@@ -7,6 +7,8 @@ export type OwnerBootstrapConfiguration = {
   token?: string;
   origin?: string;
   expiresAt?: string;
+  temporaryHttps?: string;
+  supabaseUrl?: string;
 };
 
 export function bootstrapConfiguration(): OwnerBootstrapConfiguration {
@@ -15,6 +17,8 @@ export function bootstrapConfiguration(): OwnerBootstrapConfiguration {
     token: process.env.RIVOX_BOOTSTRAP_TOKEN,
     origin: process.env.APP_ORIGIN,
     expiresAt: process.env.RIVOX_BOOTSTRAP_EXPIRES_AT,
+    temporaryHttps: process.env.RIVOX_TEMPORARY_HTTPS_SETUP,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   };
 }
 
@@ -30,9 +34,16 @@ export function localOwnerSetupEnabled(
     return false;
   try {
     const origin = new URL(configuration.origin || "");
+    const loopback =
+      origin.protocol === "http:" &&
+      ["127.0.0.1", "localhost", "[::1]"].includes(origin.hostname);
+    const temporaryHttps =
+      configuration.temporaryHttps === "true" &&
+      origin.protocol === "https:" &&
+      origin.origin === configuration.origin &&
+      localSupabaseAccountCreationAllowed(configuration.supabaseUrl || "");
     if (
-      origin.protocol !== "http:" ||
-      !["127.0.0.1", "localhost", "[::1]"].includes(origin.hostname) ||
+      (!loopback && !temporaryHttps) ||
       origin.username ||
       origin.password ||
       origin.pathname !== "/" ||
@@ -51,6 +62,18 @@ export function localOwnerSetupEnabled(
   }
 }
 
+/** Temporary HTTPS never enables bootstrap against a hosted Supabase project. */
+export function temporaryHttpsOwnerSetupEnabled(
+  configuration = bootstrapConfiguration(),
+  now = Date.now(),
+): boolean {
+  return (
+    configuration.temporaryHttps === "true" &&
+    configuration.origin?.startsWith("https://") === true &&
+    localOwnerSetupEnabled(configuration, now)
+  );
+}
+
 export function assertOwnerSetupAccess(
   request: Request,
   suppliedToken: string,
@@ -60,7 +83,7 @@ export function assertOwnerSetupAccess(
   if (!localOwnerSetupEnabled(configuration, now))
     throw new AppError(
       "OWNER_SETUP_DISABLED",
-      "Owner setup is disabled. Run the private local setup launcher.",
+      "Owner setup is disabled or its private access has expired.",
       403,
     );
   const expectedOrigin = new URL(configuration.origin!).origin;
@@ -71,7 +94,7 @@ export function assertOwnerSetupAccess(
   )
     throw new AppError(
       "INVALID_ORIGIN",
-      "Owner setup accepts requests only from its configured loopback origin.",
+      "Owner setup accepts requests only from its configured origin.",
       403,
     );
   // Hash both values before comparing so no input-dependent token-length check is exposed.
@@ -94,7 +117,10 @@ export function localSupabaseAccountCreationAllowed(
       parsed.protocol === "http:" &&
       ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname) &&
       !parsed.username &&
-      !parsed.password
+      !parsed.password &&
+      parsed.pathname === "/" &&
+      !parsed.search &&
+      !parsed.hash
     );
   } catch {
     return false;

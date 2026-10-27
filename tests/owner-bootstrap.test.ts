@@ -4,6 +4,7 @@ import {
   completeOwnerBootstrap,
   localOwnerSetupEnabled,
   localSupabaseAccountCreationAllowed,
+  temporaryHttpsOwnerSetupEnabled,
   type OwnerBootstrapDependencies,
 } from "@/domains/authentication/owner-bootstrap";
 
@@ -82,7 +83,7 @@ describe("private Owner setup boundary", () => {
         configuration,
         now,
       ),
-    ).toThrow("loopback origin");
+    ).toThrow("configured origin");
     expect(() =>
       assertOwnerSetupAccess(
         new Request("https://rivox.example/api/setup/owner", {
@@ -92,7 +93,7 @@ describe("private Owner setup boundary", () => {
         configuration,
         now,
       ),
-    ).toThrow("loopback origin");
+    ).toThrow("configured origin");
   });
   it("allows account creation only against loopback Auth, never a hosted project", () => {
     expect(localSupabaseAccountCreationAllowed("http://127.0.0.1:54321")).toBe(
@@ -104,6 +105,98 @@ describe("private Owner setup boundary", () => {
     expect(
       localSupabaseAccountCreationAllowed("http://user:pass@127.0.0.1:54321"),
     ).toBe(false);
+    for (const url of [
+      "http://127.0.0.1:54321/other",
+      "http://127.0.0.1:54321?project=hosted",
+      "http://127.0.0.1:54321#configuration",
+    ])
+      expect(localSupabaseAccountCreationAllowed(url)).toBe(false);
+  });
+});
+
+describe("explicit temporary HTTPS setup", () => {
+  const httpsConfiguration = {
+    ...configuration,
+    origin: "https://rivox-test.example",
+    temporaryHttps: "true",
+    supabaseUrl: "http://127.0.0.1:54321",
+  };
+  const httpsRequest = (
+    host = "rivox-test.example",
+    origin = "https://rivox-test.example",
+  ) =>
+    new Request("http://localhost:3000/api/setup/owner", {
+      method: "POST",
+      headers: { host, origin },
+    });
+
+  it("requires explicit opt-in and isolated local Auth in addition to valid setup credentials", () => {
+    expect(localOwnerSetupEnabled(httpsConfiguration, now)).toBe(true);
+    expect(temporaryHttpsOwnerSetupEnabled(httpsConfiguration, now)).toBe(true);
+    expect(temporaryHttpsOwnerSetupEnabled(configuration, now)).toBe(false);
+    for (const overrides of [
+      { temporaryHttps: undefined },
+      { temporaryHttps: "false" },
+      { supabaseUrl: undefined },
+      { supabaseUrl: "https://project.supabase.co" },
+      { supabaseUrl: "http://auth.remote.example:54321" },
+      { enabled: undefined },
+      { token: "short" },
+      { expiresAt: String(now - 1) },
+      { expiresAt: String(now + 2 * 60 * 60 * 1000) },
+    ])
+      expect(
+        localOwnerSetupEnabled({ ...httpsConfiguration, ...overrides }, now),
+      ).toBe(false);
+  });
+
+  it("rejects noncanonical and insecure public setup origins", () => {
+    for (const origin of [
+      "http://rivox-test.example",
+      "https://rivox-test.example/",
+      "https://rivox-test.example:443",
+      "https://rivox-test.example/setup/owner",
+      "https://rivox-test.example?setup=invalid",
+      "https://rivox-test.example#setup=invalid",
+      "https://user:password@rivox-test.example",
+    ])
+      expect(
+        localOwnerSetupEnabled({ ...httpsConfiguration, origin }, now),
+      ).toBe(false);
+  });
+
+  it("requires the configured public Host and Origin even behind a loopback reverse proxy", () => {
+    expect(() =>
+      assertOwnerSetupAccess(
+        httpsRequest(),
+        configuration.token,
+        httpsConfiguration,
+        now,
+      ),
+    ).not.toThrow();
+    for (const request of [
+      httpsRequest("attacker.example"),
+      httpsRequest("localhost:3000"),
+      httpsRequest("rivox-test.example", "https://attacker.example"),
+      httpsRequest("rivox-test.example", "http://rivox-test.example"),
+      new Request("http://localhost:3000/api/setup/owner"),
+    ])
+      expect(() =>
+        assertOwnerSetupAccess(
+          request,
+          configuration.token,
+          httpsConfiguration,
+          now,
+        ),
+      ).toThrow("configured origin");
+    expect(() =>
+      assertOwnerSetupAccess(
+        httpsRequest(),
+        "wrong token",
+        httpsConfiguration,
+        now,
+      ),
+    ).toThrow("token was not accepted");
   });
 });
 
@@ -205,6 +298,6 @@ it("accepts Next internal URL normalization only when actual Host and Origin mat
     headers: { host: "attacker.example", origin: "http://127.0.0.1:3000" },
   });
   expect(() => assertOwnerSetupAccess(bad, token, configuration)).toThrow(
-    "loopback origin",
+    "configured origin",
   );
 });

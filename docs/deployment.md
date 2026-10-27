@@ -52,6 +52,16 @@ Rebuild after public binding changes and restart after server binding changes. T
 - Apply migrations before promoting the application. Verify RLS and staff accounts against the real Supabase gateway.
 - Ensure the static build was made with the intended public Supabase bindings. The setup-only workspace is intentionally visible without credentials and contains no live data.
 
+For an operator to automate hosting and hosted migrations, configure `VERCEL_TOKEN` for `api.vercel.com` and `SUPABASE_ACCESS_TOKEN` for `api.supabase.com` in the environment's secure settings. These are provider administration credentials, separate from the Eldorado seller credentials and Supabase application API key. Never commit them or paste them into chat. Declaring these requirements does not create a deployment or grant access.
+
+## Temporary HTTPS access
+
+The first-Owner form also supports an explicitly enabled temporary HTTPS session backed by the isolated local Auth service. It requires `RIVOX_TEMPORARY_HTTPS_SETUP=true`, the exact canonical HTTPS `APP_ORIGIN`, a strong private bootstrap token, and an expiry of at most one hour. Hosted Supabase bootstrap remains disabled in this mode. The actual request Host and Origin must both match; forwarded-host headers cannot authorize setup.
+
+A private `#setup=…` capability is removed from browser history immediately and held only in component memory. It is submitted in the same-origin JSON body, never in a request URL or browser storage. The operator still chooses their own account/password and completes MFA. This mechanism does not provide a tunnel, hosting, durable storage, public SMTP, or availability after the environment stops. Use a production build with secure cookies for any externally accessible instance.
+
+The attempted isolated tunnel connectivity test was blocked before an address was issued. No public RIVOX URL was created or validated.
+
 ## Acceptance before commercial use
 
 Verify actual sign-in, TOTP, invitation delivery, expired/revoked/disabled accounts, cross-user RLS, overrides, approval separation, SMTP failure reconciliation, atomic reservations, and backup/restore on a staging project. Configure scheduled database backups and document inventory-key rotation before storing delivery credentials.

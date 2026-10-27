@@ -9,6 +9,7 @@ export default function Page() {
     <OwnerSetup
       enabled={localOwnerSetupEnabled()}
       localAccountCreation={localSupabaseAccountCreationAllowed()}
+      temporaryHttps={process.env.RIVOX_TEMPORARY_HTTPS_SETUP === "true"}
     />
   );
 }
