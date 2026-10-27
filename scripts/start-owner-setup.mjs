@@ -1,0 +1,25 @@
+// Private local setup launcher. Token stays in a mode-0600 temporary file, never in logs or URLs.
+import { randomBytes } from "node:crypto";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+const root = fileURLToPath(new URL("../", import.meta.url));
+const port = Number(process.env.RIVOX_SETUP_PORT || 3000);
+if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("Choose a valid unprivileged RIVOX_SETUP_PORT.");
+if (!existsSync(resolve(root, "node_modules/next/dist/bin/next"))) throw new Error("Run npm ci before starting local Owner setup.");
+const directory = await mkdtemp(join(tmpdir(), "rivox-owner-setup-"));
+const tokenPath = join(directory, "private-token.txt");
+const token = randomBytes(32).toString("base64url");
+await writeFile(tokenPath, token + "\n", { mode: 0o600, flag: "wx" });
+const origin = `http://127.0.0.1:${port}`;
+console.log("Private setup token file: " + tokenPath);
+console.log("Open this file locally and paste its value only into the private Owner setup form. Never send it in chat.");
+console.log("Setup address on this computer: " + origin + "/setup/owner");
+console.log("The setup session expires in 30 minutes. Stop this launcher after completion, then start normally.");
+const child = spawn(process.execPath, [resolve(root,"node_modules/next/dist/bin/next"), "dev", "--hostname", "127.0.0.1", "--port", String(port)], { cwd: root, stdio: "inherit", env: { ...process.env, APP_ORIGIN: origin, RIVOX_BOOTSTRAP_ENABLED: "true", RIVOX_BOOTSTRAP_TOKEN: token, RIVOX_BOOTSTRAP_EXPIRES_AT: String(Date.now() + 30 * 60 * 1000) } });
+for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
+child.on("error", async () => { await rm(directory,{recursive:true,force:true}); console.error("The local setup server could not start.");process.exitCode=1; });
+child.on("exit", async code => { await rm(directory,{recursive:true,force:true});process.exitCode=code ?? 1; });

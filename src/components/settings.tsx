@@ -31,6 +31,8 @@ export function Settings({ configured }: { configured: boolean }) {
     queryFn: () =>
       api<{
         eldorado: boolean;
+        eldoradoVerified?: boolean;
+        offersVerifiedSources?: string[];
         messaging: boolean;
         database: boolean;
         liveWrites: boolean;

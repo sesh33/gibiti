@@ -10,7 +10,7 @@ export async function POST(
   try {
     requireSameOrigin(request);
     const staff = await requireStaff("conversations.assign");
-    const target = z.uuid().parse((await params).id);
+    const target = z.guid().parse((await params).id);
     const { employee } = z
       .object({ employee: z.uuid() })
       .parse(await readBody(request));

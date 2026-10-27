@@ -7,3 +7,8 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 .vercel/
+
+.rivox/
+supabase/.temp/
+
+next-env.d.ts

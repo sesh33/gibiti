@@ -1,3 +1,5 @@
+import { secureSessionCookies } from "@/lib/auth-cookie-options";
+import { serverFetch } from "@/lib/server-fetch";
 import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
@@ -20,6 +22,7 @@ export async function supabaseServer() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      global: { fetch: serverFetch },
       cookies: {
         getAll: () => jar.getAll(),
         setAll(values) {
@@ -29,7 +32,7 @@ export async function supabaseServer() {
                 ...options,
                 httpOnly: true,
                 sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
+                secure: secureSessionCookies(),
               }),
             );
           } catch {

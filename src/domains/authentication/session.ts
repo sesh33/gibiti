@@ -25,7 +25,7 @@ export async function requireStaff(permission?: Permission) {
     );
   const { data: profile, error } = await db
     .from("users")
-    .select("id,display_name,email,role,active")
+    .select("id,display_name,email,role,role_label,active")
     .eq("id", user.id)
     .single();
   if (error || !profile?.active)
@@ -83,6 +83,7 @@ export async function requireStaff(permission?: Permission) {
       display_name: string;
       email: string;
       role: Role;
+      role_label: string | null;
       active: boolean;
     },
     permissions: allowed,

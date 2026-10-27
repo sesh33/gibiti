@@ -10,7 +10,7 @@ export async function POST(
   try {
     requireSameOrigin(request);
     const staff = await requireStaff("conversations.internal_notes");
-    const target = z.uuid().parse((await params).id);
+    const target = z.guid().parse((await params).id);
     const { body } = z
       .object({ body: z.string().trim().min(1).max(5000) })
       .parse(await readBody(request));

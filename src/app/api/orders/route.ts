@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         );
       }
       const cursor = z
-        .object({ date: z.iso.datetime(), id: z.uuid() })
+        .object({ date: z.iso.datetime({ offset: true }), id: z.guid() })
         .parse(raw);
       const op = input.sort === "oldest" ? "gt" : "lt";
       query = query.or(

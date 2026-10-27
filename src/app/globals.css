@@ -2516,3 +2516,18 @@ input[type="checkbox"] {
     padding: 0 2px 8px;
   }
 }
+.role-profiles-panel {
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+.role-profiles-panel .panel-title {
+  padding: 0 0 14px;
+}
+.role-profiles-panel .panel-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.role-profiles-panel > .state-badge {
+  margin: 5px;
+}

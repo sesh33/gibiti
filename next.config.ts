@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
   poweredByHeader: false,
+  logging: { incomingRequests: false },
   devIndicators: false,
   serverExternalPackages: ["@electric-sql/pglite"],
   async headers() {

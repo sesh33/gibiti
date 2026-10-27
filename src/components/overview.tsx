@@ -112,7 +112,15 @@ export function Overview({ configured }: { configured: boolean }) {
             <ShieldIcon /> Audited internal operations
           </div>
           <div>
-            <Clock3 size={16} /> Live order sync awaits credentials
+            {data && data.orders > 0 ? (
+              <>
+                <ShieldIcon /> Orders synchronized
+              </>
+            ) : (
+              <>
+                <Clock3 size={16} /> No synchronized orders yet
+              </>
+            )}
           </div>
           <div>
             <Clock3 size={16} /> Official messaging access required

@@ -16,7 +16,7 @@ export default async function Layout({
       const current = await requireStaff();
       staff = {
         name: current.profile.display_name,
-        role: current.profile.role,
+        role: current.profile.role_label || current.profile.role,
         permissions: [...current.permissions],
       };
     } catch (error) {

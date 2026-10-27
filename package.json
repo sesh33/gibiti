@@ -6,10 +6,15 @@
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "local": "node scripts/local.mjs",
+    "setup:owner": "node scripts/start-owner-setup.mjs",
+    "db:bundle": "node scripts/database-bundle.mjs",
+    "test:local": "node scripts/check-local-flow.mjs",
+    "test:live-reads": "vitest run tests/live-read.test.ts"
   },
   "engines": {
     "node": ">=22.19.0"
@@ -38,9 +43,10 @@
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "eslint": "10.13.0",
+    "eslint": "9.39.5",
     "eslint-config-next": "16.4.3",
     "eslint-config-prettier": "10.1.8",
+    "jsqr": "1.4.0",
     "prettier": "3.9.10",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",

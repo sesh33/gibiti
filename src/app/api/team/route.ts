@@ -10,7 +10,7 @@ export async function GET() {
     const { data, error } = await staff.db
       .from("users")
       .select(
-        "id,email,display_name,role,active,created_at,user_permission_overrides(permission,allowed)",
+        "id,email,display_name,role,role_label,active,created_at,user_permission_overrides(permission,allowed)",
       )
       .order("created_at");
     if (error)
@@ -67,14 +67,12 @@ export async function POST(request: Request) {
         "The invitation could not be sent. Check email delivery and existing membership.",
         502,
       );
-    const { error: profileError } = await admin
-      .from("users")
-      .insert({
-        id: data.user.id,
-        email: input.email,
-        display_name: input.name,
-        role: input.role,
-      });
+    const { error: profileError } = await admin.from("users").insert({
+      id: data.user.id,
+      email: input.email,
+      display_name: input.name,
+      role: input.role,
+    });
     if (profileError) {
       await admin
         .from("integration_errors")
@@ -85,15 +83,13 @@ export async function POST(request: Request) {
         500,
       );
     }
-    const { error: auditError } = await admin
-      .from("audit_logs")
-      .insert({
-        actor_id: staff.user.id,
-        action: "staff.invited",
-        target_type: "user",
-        target_id: data.user.id,
-        metadata: { role: input.role },
-      });
+    const { error: auditError } = await admin.from("audit_logs").insert({
+      actor_id: staff.user.id,
+      action: "staff.invited",
+      target_type: "user",
+      target_id: data.user.id,
+      metadata: { role: input.role },
+    });
     if (auditError)
       throw new AppError(
         "AUDIT_FAILED",

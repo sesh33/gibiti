@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, LockKeyhole, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
@@ -44,11 +45,11 @@ export function AuthForm({
     setError("");
     try {
       if (mode === "login") {
-        await api("/api/auth/login", {
+        const result = await api<{ next: string }>("/api/auth/login", {
           method: "POST",
           body: JSON.stringify({ email, password }),
         });
-        router.push("/inbox");
+        router.push(result.next);
       } else if (mode === "password") {
         await api("/api/auth/password", {
           method: "POST",
@@ -132,7 +133,8 @@ export function AuthForm({
             )}
             {qr && (
               <div className="qr-container">
-                <img
+                <Image
+                  unoptimized
                   src={qr}
                   width={200}
                   height={200}
@@ -216,6 +218,11 @@ export function AuthForm({
         <Link className="back-link" href="/settings">
           Workspace configuration
         </Link>
+        {mode === "login" && (
+          <Link className="back-link" href="/setup/owner">
+            Set up the first Owner
+          </Link>
+        )}
       </section>
     </main>
   );

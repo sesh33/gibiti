@@ -1,4 +1,4 @@
-import { AuthForm } from "@/components/auth-forms";
+import { InviteSession } from "@/components/invite-session";
 export default function Page() {
-  return <AuthForm mode="password" />;
+  return <InviteSession />;
 }

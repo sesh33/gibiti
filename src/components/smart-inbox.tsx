@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   CheckCheck,
-  ChevronDown,
   FileText,
   Headphones,
   Keyboard,
@@ -20,34 +19,70 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  chronologicalMessages,
+  filterConversations,
+  parseInboxView,
+  mayHandleInboxShortcut,
+  type InboxFilter,
+  type InboxStatus,
+} from "@/domains/messaging/inbox-view";
+import { replyTemplates } from "@/domains/copilot/templates";
+import type { CopilotDraft, SupportIntent } from "@/domains/copilot/provider";
+import { money } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { PageHeading } from "@/components/page-heading";
 import { QueryError } from "@/components/empty-state";
 import { api } from "@/lib/api-client";
 import type { ChatMessage, Conversation } from "@/domains/messaging/provider";
-const templates = [
-  {
-    name: "Welcome",
-    text: "Hi! Thanks for reaching out. How can I help you with your order today?",
-  },
-  {
-    name: "Checking your order",
-    text: "Thanks for your patience. I'm reviewing your order details and will update you when I have confirmed information.",
-  },
-  {
-    name: "Need more details",
-    text: "Could you share a few more details so I can assist you accurately? Please do not send passwords or payment information.",
-  },
-];
 export function SmartInbox({ configured }: { configured: boolean }) {
-  const [search, setSearch] = useState(""),
-    [filter, setFilter] = useState("all"),
-    [active, setActive] = useState<Conversation | null>(null),
-    [reply, setReply] = useState(""),
+  const params = useSearchParams(),
+    pathname = usePathname();
+  const view = parseInboxView(params);
+  const [activeId, setActiveId] = useState<string | null>(null),
+    [drafts, setDrafts] = useState<Record<string, string>>({}),
     [showTemplates, setShowTemplates] = useState(false),
-    [feedback, setFeedback] = useState("");
+    [feedback, setFeedback] = useState(""),
+    [showAssistance, setShowAssistance] = useState(false),
+    [candidate, setCandidate] = useState<{
+      draft: CopilotDraft;
+      conversationId: string | null;
+    } | null>(null);
+  function updateView(
+    change: Partial<{
+      search: string;
+      filter: InboxFilter;
+      status: InboxStatus;
+    }>,
+  ) {
+    const next = new URLSearchParams(params.toString());
+    for (const [key, value] of Object.entries(change)) {
+      if (!value || value === "all") next.delete(key);
+      else next.set(key, value);
+    }
+    window.history.replaceState(
+      null,
+      "",
+      next.size ? `${pathname}?${next}` : pathname,
+    );
+  }
   const input = useRef<HTMLTextAreaElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
   const cache = useQueryClient();
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: () =>
+      api<{ profile: { id: string }; permissions: string[] }>("/api/me"),
+    enabled: configured,
+    retry: false,
+  });
   const inbox = useQuery({
     queryKey: ["conversations"],
     queryFn: () =>
@@ -57,6 +92,11 @@ export function SmartInbox({ configured }: { configured: boolean }) {
     enabled: configured,
     refetchInterval: 30000,
   });
+  const active = inbox.data?.items.find((item) => item.id === activeId) ?? null;
+  const reply = active ? (drafts[active.id] ?? "") : "";
+  function setReply(value: string) {
+    if (active) setDrafts((current) => ({ ...current, [active.id]: value }));
+  }
   const history = useQuery({
     queryKey: ["messages", active?.id],
     queryFn: () =>
@@ -66,55 +106,142 @@ export function SmartInbox({ configured }: { configured: boolean }) {
     enabled: Boolean(active) && configured,
     refetchInterval: 15000,
   });
+  const connected = inbox.data?.provider === "official",
+    isMock = inbox.data?.provider === "mock";
+  const canCompose =
+    Boolean(active) &&
+    (connected || isMock) &&
+    Boolean(me.data?.permissions.includes("conversations.reply"));
   const send = useMutation({
-    mutationFn: () =>
+    mutationFn: (draft: {
+      conversationId: string;
+      text: string;
+      mock: boolean;
+    }) =>
       api("/api/messaging", {
         method: "POST",
-        body: JSON.stringify({ conversationId: active?.id, text: reply }),
+        body: JSON.stringify({
+          conversationId: draft.conversationId,
+          text: draft.text,
+        }),
       }),
-    onSuccess: () => {
-      setReply("");
-      cache.invalidateQueries({ queryKey: ["messages", active?.id] });
-      setFeedback("Development message saved. Nothing was sent to Eldorado.");
+    onSuccess: (_data, draft) => {
+      setDrafts((current) =>
+        current[draft.conversationId] === draft.text
+          ? { ...current, [draft.conversationId]: "" }
+          : current,
+      );
+      cache.invalidateQueries({ queryKey: ["messages", draft.conversationId] });
+      setFeedback(
+        draft.mock
+          ? "Development message saved. Nothing was sent to Eldorado."
+          : "Message sent through the authorized messaging provider.",
+      );
     },
     onError: (error) => setFeedback(error.message),
   });
-  const connected = inbox.data?.provider === "official",
-    isMock = inbox.data?.provider === "mock",
-    canCompose = Boolean(active) && (connected || isMock);
+  const assistance = useMutation({
+    mutationFn: (conversationId: string) =>
+      api<{ draft: CopilotDraft }>("/api/copilot", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId,
+          mode: "template",
+          task: "suggest_reply",
+        }),
+      }),
+    onSuccess: (result, conversationId) =>
+      setCandidate({ draft: result.draft, conversationId }),
+  });
+  function submitReply() {
+    if (active && canCompose && reply.trim() && !send.isPending)
+      send.mutate({
+        conversationId: active.id,
+        text: reply.trim(),
+        mock: isMock,
+      });
+  }
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing) return;
       if (
         (event.metaKey || event.ctrlKey) &&
         event.key === "Enter" &&
+        mayHandleInboxShortcut(event.target, input.current) &&
         canCompose &&
+        active &&
         reply.trim() &&
         !send.isPending
       ) {
         event.preventDefault();
-        send.mutate();
+        send.mutate({
+          conversationId: active.id,
+          text: reply.trim(),
+          mock: isMock,
+        });
+        return;
       }
+      const target = event.target;
       if (
         event.key === "/" &&
-        !(event.target instanceof HTMLInputElement) &&
-        !(event.target instanceof HTMLTextAreaElement)
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        target instanceof HTMLElement &&
+        !target.closest(
+          'input, textarea, select, [contenteditable="true"], [role="dialog"]',
+        )
       ) {
         event.preventDefault();
-        input.current?.focus();
+        searchInput.current?.focus();
       }
     }
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
-  }, [canCompose, reply, send]);
-  const rows = (inbox.data?.items ?? []).filter(
-    (c) =>
-      (filter === "all" ||
-        (filter === "unread" && c.unread) ||
-        (filter === "priority" && c.priority === "high")) &&
-      `${c.buyer} ${c.orderId} ${c.product}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+  }, [active, canCompose, isMock, reply, send]);
+  const rows = filterConversations(
+    inbox.data?.items ?? [],
+    view,
+    me.data?.profile.id,
   );
+  const orderedMessages = chronologicalMessages(history.data?.messages ?? []);
+  const orderContext = useQuery({
+    queryKey: ["inbox-order", active?.orderId],
+    queryFn: () =>
+      api<{
+        order: {
+          id: string;
+          buyer_username: string;
+          product_title: string;
+          amount: number;
+          currency: string;
+          quantity: number;
+          state: string;
+          delivery_method: string | null;
+          purchased_at: string;
+        };
+      }>(`/api/orders/${encodeURIComponent(active!.orderId)}`),
+    enabled:
+      configured &&
+      Boolean(active) &&
+      !isMock &&
+      /^[0-9a-f-]{36}$/i.test(active?.orderId ?? ""),
+    retry: false,
+  });
+  function previewTemplate(intent: SupportIntent) {
+    const template = replyTemplates.find((item) => item.id === intent)!;
+    setCandidate({
+      conversationId: active?.id ?? null,
+      draft: {
+        source: "template",
+        text: template.text,
+        intent,
+        requiresHumanReview: true,
+        escalate: template.escalate,
+        reason: "A reusable English template. Review all facts before sending.",
+      },
+    });
+  }
   return (
     <>
       <PageHeading
@@ -159,7 +286,9 @@ export function SmartInbox({ configured }: { configured: boolean }) {
               className="icon-button"
               aria-label="Show priority conversations"
               onClick={() =>
-                setFilter(filter === "priority" ? "all" : "priority")
+                updateView({
+                  filter: view.filter === "priority" ? "all" : "priority",
+                })
               }
             >
               <SlidersHorizontal size={15} />
@@ -170,24 +299,45 @@ export function SmartInbox({ configured }: { configured: boolean }) {
             <input
               aria-label="Search conversations"
               placeholder="Search conversations..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              ref={searchInput}
+              value={view.search}
+              onChange={(e) =>
+                updateView({ search: e.target.value.slice(0, 100) })
+              }
             />
             <kbd>/</kbd>
           </label>
           <div className="segmented">
-            {["all", "unread", "priority"].map((value) => (
-              <button
-                className={filter === value ? "selected" : ""}
-                key={value}
-                onClick={() => setFilter(value)}
-              >
-                {value === "all"
-                  ? "All conversations"
-                  : value[0].toUpperCase() + value.slice(1)}
-              </button>
-            ))}
+            {(["all", "unread", "priority", "assigned"] as const).map(
+              (value) => (
+                <button
+                  className={view.filter === value ? "selected" : ""}
+                  key={value}
+                  onClick={() => updateView({ filter: value })}
+                >
+                  {value === "all"
+                    ? "All conversations"
+                    : value === "assigned"
+                      ? "Assigned to me"
+                      : value[0].toUpperCase() + value.slice(1)}
+                </button>
+              ),
+            )}
           </div>
+          <label className="select-label" style={{ padding: "0 15px 12px" }}>
+            Status
+            <select
+              aria-label="Filter conversation status"
+              value={view.status}
+              onChange={(event) =>
+                updateView({ status: event.target.value as InboxStatus })
+              }
+            >
+              <option value="all">All statuses</option>
+              <option value="open">Open</option>
+              <option value="resolved">Resolved</option>
+            </select>
+          </label>
           <div className="conversation-results">
             {inbox.isLoading ? (
               <div className="skeleton-lines" />
@@ -197,7 +347,8 @@ export function SmartInbox({ configured }: { configured: boolean }) {
                   className={`conversation-row ${active?.id === c.id ? "selected" : ""}`}
                   key={c.id}
                   onClick={() => {
-                    setActive(c);
+                    setActiveId(c.id);
+                    setCandidate(null);
                     setFeedback("");
                   }}
                 >
@@ -209,7 +360,14 @@ export function SmartInbox({ configured }: { configured: boolean }) {
                     <p>{c.product}</p>
                     <small>
                       {c.orderId} ·{" "}
-                      {c.priority === "high" ? "High priority" : "Open"}
+                      {c.priority === "high"
+                        ? "High priority"
+                        : c.status === "resolved"
+                          ? "Resolved"
+                          : "Open"}
+                      {c.assignedTo === me.data?.profile.id
+                        ? " · Assigned to you"
+                        : ""}
                     </small>
                   </div>
                   {c.unread && <span className="unread-dot" />}
@@ -221,12 +379,12 @@ export function SmartInbox({ configured }: { configured: boolean }) {
                   <MessageSquare size={22} />
                 </span>
                 <strong>
-                  {search
+                  {view.search
                     ? "No matching conversations"
                     : "A quieter inbox starts here"}
                 </strong>
                 <p>
-                  {search
+                  {view.search
                     ? "Try another buyer, order, or product."
                     : "Your buyer conversations will appear once an official messaging integration is connected."}
                 </p>
@@ -258,7 +416,11 @@ export function SmartInbox({ configured }: { configured: boolean }) {
             </div>
             <span className="chat-header-actions">
               <span className="pill pill-muted">
-                {active ? "Open" : "No conversation selected"}
+                {active
+                  ? active.status === "resolved"
+                    ? "Resolved"
+                    : "Open"
+                  : "No conversation selected"}
               </span>
             </span>
           </div>
@@ -283,7 +445,7 @@ export function SmartInbox({ configured }: { configured: boolean }) {
                 <div className="message-date">
                   {isMock ? "DEVELOPMENT CONVERSATION" : "CONVERSATION HISTORY"}
                 </div>
-                {history.data?.messages.map((message) => (
+                {orderedMessages.map((message) => (
                   <div
                     className={`message ${message.sender === "agent" ? "outgoing" : ""}`}
                     key={message.id}
@@ -366,7 +528,7 @@ export function SmartInbox({ configured }: { configured: boolean }) {
             />
             {showTemplates && (
               <div className="quick-replies">
-                {templates.map((template) => (
+                {replyTemplates.map((template) => (
                   <button
                     key={template.name}
                     onClick={() => {
@@ -398,9 +560,9 @@ export function SmartInbox({ configured }: { configured: boolean }) {
                   <FileText size={16} />
                 </button>
                 <button
-                  aria-label="AI Copilot not configured"
-                  title="AI Copilot requires configuration and privacy review"
-                  disabled
+                  aria-label="Open reply assistance"
+                  title="Local templates available; external AI is not configured"
+                  onClick={() => setShowAssistance(true)}
                 >
                   <Sparkles size={16} />
                 </button>
@@ -408,7 +570,7 @@ export function SmartInbox({ configured }: { configured: boolean }) {
               <span>⌘ Enter to send</span>
               <Button
                 size="sm"
-                onClick={() => send.mutate()}
+                onClick={submitReply}
                 disabled={!canCompose || !reply.trim() || send.isPending}
               >
                 {send.isPending
@@ -443,10 +605,36 @@ export function SmartInbox({ configured }: { configured: boolean }) {
           <div className="context-fields">
             {[
               ["Order ID", active?.orderId ?? "—"],
-              ["Buyer", active?.buyer ?? "—"],
-              ["Product", active?.product ?? "—"],
-              ["Payment", "—"],
-              ["Delivery status", "—"],
+              [
+                "Buyer",
+                orderContext.data?.order.buyer_username ?? active?.buyer ?? "—",
+              ],
+              [
+                "Product",
+                orderContext.data?.order.product_title ??
+                  active?.product ??
+                  "—",
+              ],
+              [
+                "Payment",
+                orderContext.data
+                  ? money(
+                      Number(orderContext.data.order.amount),
+                      orderContext.data.order.currency,
+                    )
+                  : "—",
+              ],
+              ["Delivery status", orderContext.data?.order.state ?? "—"],
+              [
+                "Quantity",
+                orderContext.data
+                  ? String(orderContext.data.order.quantity)
+                  : "—",
+              ],
+              [
+                "Delivery method",
+                orderContext.data?.order.delivery_method ?? "—",
+              ],
               ["Assigned agent", active?.assignedTo ?? "Unassigned"],
             ].map(([key, value]) => (
               <div key={key}>
@@ -455,6 +643,11 @@ export function SmartInbox({ configured }: { configured: boolean }) {
               </div>
             ))}
           </div>
+          {orderContext.isError && (
+            <p className="form-error" role="status">
+              Order context is unavailable or outside your assigned access.
+            </p>
+          )}
           {active && !isMock && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/orders/${active.orderId}`}>
@@ -467,16 +660,102 @@ export function SmartInbox({ configured }: { configured: boolean }) {
             <div>
               <Sparkles size={16} />
               <span>RIVOX COPILOT</span>
-              <span className="tiny-badge">OFF</span>
+              <span className="tiny-badge">AI OFF</span>
             </div>
             <h4>A second pair of eyes.</h4>
-            <p>Context-aware assistance, with a human always in control.</p>
-            <Link href="/settings">
-              View requirements <ArrowUpRight size={12} />
-            </Link>
+            <p>
+              External AI is off. Explore English reply templates without
+              sending buyer data to a provider.
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowAssistance(true)}
+            >
+              Explore reply templates
+              <ArrowUpRight size={12} />
+            </Button>
           </div>
         </aside>
       </div>
+      <Dialog open={showAssistance} onOpenChange={setShowAssistance}>
+        <DialogContent>
+          <DialogTitle>Reply assistance</DialogTitle>
+          <DialogDescription>
+            External AI is not configured. These local English templates do not
+            use AI or send data outside this workspace. Every response remains
+            your decision.
+          </DialogDescription>
+          <div className="quick-replies">
+            {replyTemplates.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => previewTemplate(template.id)}
+              >
+                {template.name}
+                <ArrowUpRight size={12} />
+              </button>
+            ))}
+          </div>
+          <Button
+            variant="outline"
+            disabled={!canCompose || assistance.isPending}
+            onClick={() => active && assistance.mutate(active.id)}
+          >
+            {assistance.isPending
+              ? "Selecting template..."
+              : "Suggest a local template"}
+          </Button>
+          {assistance.isError && (
+            <p role="alert" className="form-error">
+              {assistance.error.message}
+            </p>
+          )}
+          {candidate && (
+            <div className="internal-note">
+              <span className="eyebrow">TEMPLATE · HUMAN REVIEW REQUIRED</span>
+              <p>{candidate.draft.text}</p>
+              {candidate.draft.escalate && (
+                <p className="form-error">
+                  Supervisor review recommended. No operation has been requested
+                  or executed.
+                </p>
+              )}
+              <p>{candidate.draft.reason}</p>
+              <Button
+                disabled={
+                  !canCompose || candidate.conversationId !== active?.id
+                }
+                onClick={() => {
+                  setReply(candidate.draft.text);
+                  setShowAssistance(false);
+                  setFeedback(
+                    "Template inserted as a draft. Review it before sending.",
+                  );
+                  input.current?.focus();
+                }}
+              >
+                Use as draft
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(candidate.draft.text);
+                    setFeedback("Template copied. Nothing was sent.");
+                  } catch {
+                    setFeedback(
+                      "Clipboard unavailable. Select the template text to copy it.",
+                    );
+                  }
+                }}
+              >
+                Copy template
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

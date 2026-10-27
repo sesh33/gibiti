@@ -414,3 +414,77 @@ it("releases a reservation and requires a distinct reviewer for internal consump
     ).rows.length,
   ).toBeGreaterThanOrEqual(3);
 });
+
+it("creates a custom role snapshot and applies it only after independent approval", async () => {
+  await identity(ids.owner, "aal2", "77777777-7777-4777-8777-777777777777");
+  const profile = (
+    await db.query<{ create_role_profile: string }>(
+      "select public.create_role_profile($1,$2,$3)",
+      [
+        "Fixture delivery",
+        "SUPPORT_AGENT",
+        JSON.stringify([
+          { permission: "orders.deliver", allowed: true },
+          { permission: "orders.cancel", allowed: false },
+        ]),
+      ],
+    )
+  ).rows[0].create_role_profile;
+  const args = [
+    ids.agent,
+    profile,
+    true,
+    "Synthetic reusable role assignment",
+    "12121212-1212-4212-8212-121212121212",
+  ];
+  const request = (
+    await db.query<{ request_staff_role_profile: string }>(
+      "select public.request_staff_role_profile($1,$2,$3,$4,$5)",
+      args,
+    )
+  ).rows[0].request_staff_role_profile;
+  expect(
+    (
+      await db.query<{ request_staff_role_profile: string }>(
+        "select public.request_staff_role_profile($1,$2,$3,$4,$5)",
+        args,
+      )
+    ).rows[0].request_staff_role_profile,
+  ).toBe(request);
+  await identity(ids.admin, "aal2", "abababab-abab-4bab-8bab-abababababab");
+  await db.query("select public.decide_approval($1,true,$2)", [
+    request,
+    "Synthetic independent role review",
+  ]);
+  await reset();
+  expect(
+    (
+      await db.query<{ role_label: string }>(
+        "select role_label from public.users where id=$1",
+        [ids.agent],
+      )
+    ).rows[0].role_label,
+  ).toBe("Fixture delivery");
+  await identity(ids.agent, "aal1", "dededede-dede-4ede-8ede-dededededede");
+  expect(
+    (
+      await db.query<{ has_permission: boolean }>(
+        "select public.has_permission('orders.deliver')",
+      )
+    ).rows[0].has_permission,
+  ).toBe(true);
+  expect(
+    (
+      await db.query<{ has_permission: boolean }>(
+        "select public.has_permission('orders.cancel')",
+      )
+    ).rows[0].has_permission,
+  ).toBe(false);
+  await expect(
+    db.query("select public.create_role_profile($1,$2,$3)", [
+      "Unpermitted role",
+      "ADMIN",
+      "[]",
+    ]),
+  ).rejects.toThrow("Access denied");
+});

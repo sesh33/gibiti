@@ -6,7 +6,7 @@ import { requireSameOrigin, readBody } from "@/lib/http";
 import { AppError, errorResponse } from "@/lib/errors";
 export async function GET(request: Request) {
   try {
-    const staff = await requireStaff("conversations.read");
+    await requireStaff("conversations.read");
     const provider = messagingProvider();
     const id = new URL(request.url).searchParams.get("id");
     if (provider.kind === "official")

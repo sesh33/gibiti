@@ -33,8 +33,25 @@ export async function GET(
         .select("provider,code,created_at")
         .order("created_at", { ascending: false })
         .limit(10);
+      const { data: sync } = await staff.db
+        .from("integration_sync_state")
+        .select("provider,last_success_at");
       return NextResponse.json(
         {
+          eldoradoVerified: Boolean(
+            sync?.some(
+              (item) => item.provider === "eldorado" && item.last_success_at,
+            ),
+          ),
+          offersVerifiedSources:
+            sync
+              ?.filter(
+                (item) =>
+                  item.provider.startsWith("eldorado-offers:") &&
+                  item.last_success_at,
+              )
+              .map((item) => item.provider.replace("eldorado-offers:", "")) ??
+            [],
           eldorado: eldoradoConfigured(),
           messaging: false,
           database: true,

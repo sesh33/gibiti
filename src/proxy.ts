@@ -1,3 +1,5 @@
+import { secureSessionCookies } from "@/lib/auth-cookie-options";
+import { serverFetch } from "@/lib/server-fetch";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
@@ -6,6 +8,7 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   if (!url || !key) return response;
   const db = createServerClient(url, key, {
+    global: { fetch: serverFetch },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(values) {
@@ -16,7 +19,7 @@ export async function proxy(request: NextRequest) {
             ...options,
             httpOnly: true,
             sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
+            secure: secureSessionCookies(),
           }),
         );
       },

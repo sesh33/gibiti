@@ -1,3 +1,4 @@
+import { serverFetch } from "@/lib/server-fetch";
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { AppError } from "@/lib/errors";
@@ -13,5 +14,6 @@ export function supabaseAdmin() {
     );
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: serverFetch },
   });
 }

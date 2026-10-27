@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     requireSameOrigin(request);
     const staff = await requireStaff("inventory.manage");
     const body = z
-      .object({ item: z.uuid(), order: z.uuid() })
+      .object({ item: z.uuid(), order: z.guid() })
       .parse(await readBody(request));
     const { data, error } = await staff.db.rpc("reserve_inventory", {
       item: body.item,

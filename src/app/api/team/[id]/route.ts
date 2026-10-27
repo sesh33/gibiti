@@ -15,6 +15,7 @@ export async function PATCH(
     const body = z
       .object({
         role: z.enum(roles),
+        roleProfileId: z.uuid().optional(),
         active: z.boolean(),
         reason: z.string().trim().min(10).max(2000),
         idempotencyKey: z.uuid(),
@@ -25,14 +26,22 @@ export async function PATCH(
           .max(permissions.length),
       })
       .parse(await readBody(request));
-    const { data, error } = await staff.db.rpc("request_staff_access_change", {
-      target,
-      new_role: body.role,
-      new_active: body.active,
-      overrides: body.overrides,
-      justification: body.reason,
-      request_key: body.idempotencyKey,
-    });
+    const { data, error } = body.roleProfileId
+      ? await staff.db.rpc("request_staff_role_profile", {
+          target,
+          profile_id: body.roleProfileId,
+          new_active: body.active,
+          justification: body.reason,
+          request_key: body.idempotencyKey,
+        })
+      : await staff.db.rpc("request_staff_access_change", {
+          target,
+          new_role: body.role,
+          new_active: body.active,
+          overrides: body.overrides,
+          justification: body.reason,
+          request_key: body.idempotencyKey,
+        });
     if (error)
       throw new AppError(
         "STAFF_CHANGE_REJECTED",

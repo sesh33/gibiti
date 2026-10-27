@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { RoleProfiles, type RoleProfile } from "@/components/role-profiles";
 import { InventoryActions } from "@/components/inventory-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Layers3, Plus, ShieldCheck, X } from "lucide-react";
@@ -25,6 +26,7 @@ type Staff = {
   email: string;
   display_name: string;
   role: Role;
+  role_label?: string | null;
   active: boolean;
   user_permission_overrides: { permission: string; allowed: boolean }[];
 };
@@ -68,7 +70,14 @@ export function TeamModule({ configured }: { configured: boolean }) {
     [overrides, setOverrides] = useState<Record<string, string>>({}),
     [notice, setNotice] = useState(""),
     [changeReason, setChangeReason] = useState(""),
-    [requestKey, setRequestKey] = useState("");
+    [requestKey, setRequestKey] = useState(""),
+    [roleProfileId, setRoleProfileId] = useState("");
+  const profiles = useQuery({
+    queryKey: ["role-profiles"],
+    queryFn: () => api<{ items: RoleProfile[] }>("/api/team/roles"),
+    enabled: configured,
+    retry: false,
+  });
   const team = useQuery({
     queryKey: ["team"],
     queryFn: () => api<{ items: Staff[] }>("/api/team"),
@@ -81,6 +90,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
             method: "PATCH",
             body: JSON.stringify({
               role,
+              ...(roleProfileId ? { roleProfileId } : {}),
               active,
               reason: changeReason,
               idempotencyKey: requestKey,
@@ -108,6 +118,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
     onError: (e) => setNotice(e.message),
   });
   function invite() {
+    setRoleProfileId("");
     setEditing(null);
     setName("");
     setEmail("");
@@ -115,6 +126,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
     setOpen(true);
   }
   function edit(user: Staff) {
+    setRoleProfileId("");
     setRequestKey(crypto.randomUUID());
     setChangeReason("");
     setEditing(user);
@@ -181,7 +193,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
                       </td>
                       <td>
                         <span className="state-badge">
-                          {user.role.replaceAll("_", " ")}
+                          {user.role_label || user.role.replaceAll("_", " ")}
                         </span>
                       </td>
                       <td>
@@ -215,6 +227,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
           </>
         )}
       </section>
+      <RoleProfiles configured={configured} />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogTitle>
@@ -253,10 +266,43 @@ export function TeamModule({ configured }: { configured: boolean }) {
                 </label>
               </>
             )}
+            {editing && (
+              <label className="field-label">
+                Saved custom role
+                <select
+                  value={roleProfileId}
+                  onChange={(e) => {
+                    setRoleProfileId(e.target.value);
+                    const profile = profiles.data?.items.find(
+                      (item) => item.id === e.target.value,
+                    );
+                    if (profile) {
+                      setRole(profile.base_role);
+                      setOverrides(
+                        Object.fromEntries(
+                          profile.overrides.map((item) => [
+                            item.permission,
+                            item.allowed ? "allow" : "deny",
+                          ]),
+                        ),
+                      );
+                    }
+                  }}
+                >
+                  <option value="">Individual configuration</option>
+                  {profiles.data?.items.map((profile) => (
+                    <option value={profile.id} key={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="field-label">
               Role
               <select
                 value={role}
+                disabled={Boolean(roleProfileId)}
                 onChange={(e) => setRole(e.target.value as Role)}
               >
                 {roles
@@ -278,7 +324,10 @@ export function TeamModule({ configured }: { configured: boolean }) {
                   />
                   Account active
                 </label>
-                <details className="permission-editor">
+                <details
+                  className="permission-editor"
+                  inert={Boolean(roleProfileId)}
+                >
                   <summary>Individual permission overrides</summary>
                   {permissions.map((permission) => (
                     <label key={permission}>

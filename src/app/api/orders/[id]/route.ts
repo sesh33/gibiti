@@ -1,3 +1,4 @@
+import { normalizeOrderDetail } from "@/domains/orders/shape";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/domains/authentication/session";
@@ -8,7 +9,7 @@ export async function GET(
 ) {
   try {
     const staff = await requireStaff();
-    const id = z.uuid().parse((await params).id);
+    const id = z.guid().parse((await params).id);
     const { data, error } = await staff.db
       .from("orders")
       .select("*,order_state_history(*),order_assignments(*),internal_notes(*)")
@@ -21,7 +22,7 @@ export async function GET(
         404,
       );
     return NextResponse.json(
-      { order: data },
+      { order: normalizeOrderDetail(data) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

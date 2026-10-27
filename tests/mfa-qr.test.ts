@@ -53,3 +53,18 @@ describe("MFA QR image normalization", () => {
     );
   });
 });
+
+it("accepts the real GoTrue XML declaration and static paint style format without allowing active CSS", () => {
+  const raw =
+    '<?xml version="1.0" encoding="UTF-8"?>\n<!-- Generated local QR fixture -->\n<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect style="fill: rgb(255, 255, 255);" width="20" height="20"/><rect style="fill: #000000;" width="5" height="5"/></svg>';
+  const result = normalizeMfaQrCode("data:image/svg+xml;utf-8," + raw);
+  const decoded = decodeURIComponent(result.split(",").slice(1).join(","));
+  expect(decoded).toContain('fill="rgb(255, 255, 255)"');
+  expect(decoded).not.toContain("<?xml");
+  expect(decoded).not.toContain("style=");
+  expect(() =>
+    normalizeMfaQrCode(
+      '<svg><rect style="fill:url(https://example.test)"/></svg>',
+    ),
+  ).toThrow();
+});
