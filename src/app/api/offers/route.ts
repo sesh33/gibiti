@@ -78,7 +78,7 @@ export async function GET(request: Request) {
             : null,
         sync: sync ?? [],
         scope:
-          "Synchronized read-only listings; upstream pagination contracts remain unverified.",
+          "Synchronized source records may overlap. Availability actions require separate authorization and confirmation; upstream pagination remains unverified.",
       },
       { headers: { "Cache-Control": "no-store" } },
     );

@@ -10,6 +10,7 @@ export default function Page() {
       enabled={localOwnerSetupEnabled()}
       localAccountCreation={localSupabaseAccountCreationAllowed()}
       temporaryHttps={process.env.RIVOX_TEMPORARY_HTTPS_SETUP === "true"}
+      hosted={process.env.RIVOX_HOSTED_OWNER_SETUP === "true"}
     />
   );
 }

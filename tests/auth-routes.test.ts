@@ -63,7 +63,7 @@ describe("individual staff login", () => {
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ ok: true, next: "/mfa" });
   });
-  it("routes a verified privileged login to the inbox", async () => {
+  it("routes a verified privileged login through the permission-aware workspace entry", async () => {
     fixture.auth.mfa.getAuthenticatorAssuranceLevel.mockResolvedValue({
       data: { currentLevel: "aal2" },
       error: null,
@@ -74,7 +74,7 @@ describe("individual staff login", () => {
         password: "synthetic-password",
       }),
     );
-    expect((await result.json()).next).toBe("/inbox");
+    expect((await result.json()).next).toBe("/");
   });
   it.each([null, { role: "VIEWER", active: false }])(
     "does not leave a signed-in session for missing/inactive membership",

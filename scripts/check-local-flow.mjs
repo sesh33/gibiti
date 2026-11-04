@@ -125,7 +125,7 @@ async function mfa(target) {
     .getByRole("textbox", { name: "Six-digit verification code" })
     .fill(otp(secret));
   await target.getByRole("button", { name: "Verify and continue" }).click();
-  await target.waitForURL("**/inbox");
+  await target.waitForURL("**/offers");
   checks++;
 }
 async function call(context, path, method = "GET", data) {
@@ -277,7 +277,7 @@ try {
   await supportPage
     .getByRole("button", { name: "Save password", exact: true })
     .click();
-  await supportPage.waitForURL("**/inbox");
+  await supportPage.waitForURL("**/orders");
   checks++;
   const restricted = await call(supportContext, "/api/orders");
   assert.equal(restricted.status, 200);

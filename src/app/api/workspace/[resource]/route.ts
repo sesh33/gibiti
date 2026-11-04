@@ -57,6 +57,7 @@ export async function GET(
           database: true,
           errors: errors ?? [],
           liveWrites: false,
+          availabilityActions: eldoradoConfigured(),
         },
         { headers: { "Cache-Control": "no-store" } },
       );

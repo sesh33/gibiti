@@ -8,9 +8,11 @@ import { normalizeOffer, parseSellerOfferPage } from "./schemas";
 export { documentedOfferReadEndpoints } from "./definitions";
 export const offerIntegrationStatus = {
   readAdapterReady: true,
-  liveWrites: false,
+  availabilityActions: ["pause", "resume"],
+  otherWrites: false,
+  liveWriteValidation: "not-performed",
   reason:
-    "Official read adapters are available. Actual readiness is determined by each authenticated synchronization result; writes remain disabled.",
+    "Official reads and individual pause/resume actions are implemented. Availability changes require current permissions, explicit confirmation and upstream state verification. No commercial write was used as a setup test.",
 };
 
 export async function readSellerOfferPage(source: OfferSource) {

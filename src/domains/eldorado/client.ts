@@ -1,7 +1,12 @@
 import "server-only";
 import { z } from "zod";
 import { AppError } from "@/lib/errors";
-import { serverFetch } from "@/lib/server-fetch";
+import type { OfferSource } from "@/domains/offers/definitions";
+import {
+  currencyOfferSearchBody,
+  currencyOffersFetch,
+  serverFetch,
+} from "@/lib/server-fetch";
 
 // The apex host redirects POST to www. Use the canonical, explicitly authorized
 // origin directly so credentials are never replayed through an arbitrary redirect.
@@ -85,6 +90,16 @@ export const orderPageSchema = z.object({
 export type UpstreamOrder = z.infer<typeof upstreamOrder>;
 export type OrderPage = z.infer<typeof orderPageSchema>;
 
+const availabilityRoutes: Record<
+  OfferSource,
+  { prefix: string; method: "PUT" | "POST" }
+> = {
+  flexible: { prefix: "/api/flexibleOffersUser/me/", method: "PUT" },
+  predefined: { prefix: "/api/predefinedOffersUser/me/", method: "PUT" },
+  items: { prefix: "/api/v1/item-management/me/offers/", method: "POST" },
+  currency: { prefix: "/api/v1/currency-management/me/offers/", method: "PUT" },
+};
+
 export class EldoradoClient {
   private token: string | undefined;
   private expiresAt = 0;
@@ -143,7 +158,13 @@ export class EldoradoClient {
     options: RequestInit,
   ): Promise<Response> {
     try {
-      return await this.fetcher(url, options);
+      const fetcher =
+        this.fetcher === serverFetch &&
+        options.method === "GET" &&
+        options.body === currencyOfferSearchBody
+          ? currencyOffersFetch
+          : this.fetcher;
+      return await fetcher(url, options);
     } catch {
       throw new AppError(
         "ELDORADO_UNREACHABLE",
@@ -240,6 +261,13 @@ export class EldoradoClient {
       }
       url.searchParams.set(name, value);
     }
+    const currencySearch = path === "/api/v1/currency-management/me/offers";
+    if (currencySearch && url.search)
+      throw new AppError(
+        "CURRENCY_QUERY_UNVERIFIED",
+        "Currency search currently supports only the verified initial-page JSON request.",
+        400,
+      );
     this.assertRateLimit();
     for (let attempt = 0; attempt < 2; attempt++) {
       const token = await this.authenticate();
@@ -249,7 +277,9 @@ export class EldoradoClient {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
+          ...(currencySearch ? { "Content-Type": "application/json" } : {}),
         },
+        ...(currencySearch ? { body: currencyOfferSearchBody } : {}),
         redirect: "error",
         signal: AbortSignal.timeout(20000),
         cache: "no-store",
@@ -283,6 +313,177 @@ export class EldoradoClient {
           502,
         );
       }
+    }
+    throw new AppError(
+      "ELDORADO_AUTH_FAILED",
+      "Eldorado rejected the refreshed token.",
+      502,
+    );
+  }
+
+  /** One explicitly confirmed listing action. Never retries a commercial write. */
+  async setOfferAvailability(
+    source: OfferSource,
+    nativeId: string,
+    action: "pause" | "resume",
+  ): Promise<void> {
+    if (
+      !Object.hasOwn(availabilityRoutes, source) ||
+      !/^[A-Za-z0-9_-]{1,150}$/.test(nativeId) ||
+      (action !== "pause" && action !== "resume")
+    )
+      throw new AppError(
+        "INVALID_AVAILABILITY_TARGET",
+        "Choose one supported listing and availability action.",
+        400,
+      );
+    let token: string;
+    try {
+      token = await this.authenticate();
+      this.assertRateLimit();
+    } catch {
+      throw new AppError(
+        "ELDORADO_WRITE_NOT_SENT",
+        "Eldorado authentication is unavailable. No listing change was sent.",
+        502,
+      );
+    }
+    const route = availabilityRoutes[source];
+    let response: Response;
+    try {
+      response = await this.request(
+        new URL(route.prefix + nativeId + "/" + action, origin),
+        {
+          method: route.method,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          redirect: "error",
+          signal: AbortSignal.timeout(20000),
+          cache: "no-store",
+        },
+      );
+    } catch {
+      throw new AppError(
+        "ELDORADO_WRITE_UNKNOWN",
+        "The listing change could not be confirmed. Do not submit it again; check its status.",
+        502,
+      );
+    }
+    if (response.ok) {
+      await this.discard(response);
+      return;
+    }
+    const status = response.status;
+    if (status === 401 && this.token === token) {
+      // A later, separately confirmed request may authenticate again. The
+      // rejected commercial request itself is never replayed.
+      this.token = undefined;
+      this.expiresAt = 0;
+    }
+    if (status === 429) {
+      try {
+        await this.rejectRateLimit(response);
+      } catch {
+        // Preserve the shared cooldown while classifying this request as an
+        // explicit upstream rejection, rather than an ambiguous retry.
+      }
+    } else {
+      await this.discard(response);
+    }
+    if (status >= 400 && status < 500 && status !== 408 && status !== 499)
+      throw new AppError(
+        "ELDORADO_WRITE_REJECTED",
+        `Eldorado rejected this listing change (HTTP ${status}).`,
+        502,
+      );
+    throw new AppError(
+      "ELDORADO_WRITE_UNKNOWN",
+      "Eldorado did not confirm the listing change. Check its status before taking another action.",
+      502,
+    );
+  }
+
+  /** Read only an individual listing's identity/state; discard all private envelope fields. */
+  async offerState(
+    source: OfferSource,
+    nativeId: string,
+  ): Promise<{ id: string; state: string }> {
+    const id = z.guid().safeParse(nativeId);
+    if (!id.success)
+      throw new AppError(
+        "INVALID_OFFER_ID",
+        "Choose a valid marketplace listing identifier.",
+        400,
+      );
+    const path =
+      source === "flexible"
+        ? `/api/flexibleOffers/${id.data}/private`
+        : source === "predefined"
+          ? `/api/predefinedOffers/${id.data}/private`
+          : source === "currency"
+            ? `/api/v1/currency-management/me/offers/${id.data}`
+            : undefined;
+    if (!path)
+      throw new AppError(
+        "OFFER_STATE_READ_UNAVAILABLE",
+        "An individual state read has not been verified for this listing family.",
+        503,
+      );
+    this.assertRateLimit();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const token = await this.authenticate();
+      this.assertRateLimit();
+      const response = await this.request(new URL(path, origin), {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        redirect: "error",
+        signal: AbortSignal.timeout(20000),
+        cache: "no-store",
+      });
+      if (response.status === 401 && attempt === 0) {
+        await this.discard(response);
+        if (this.token === token) {
+          this.token = undefined;
+          this.expiresAt = 0;
+        }
+        continue;
+      }
+      if (response.status === 429) return this.rejectRateLimit(response);
+      if (!response.ok) {
+        await this.discard(response);
+        throw new AppError(
+          "ELDORADO_REQUEST_FAILED",
+          `Eldorado listing read returned HTTP ${response.status}.`,
+          502,
+        );
+      }
+      const parsed = z
+        .object({
+          offer: z.object({
+            id: z.guid(),
+            offerState: z.string().min(1).max(100),
+          }),
+        })
+        .safeParse(await this.json(response));
+      if (
+        !parsed.success ||
+        parsed.data.offer.id.toLowerCase() !== id.data.toLowerCase()
+      )
+        throw new AppError(
+          "UPSTREAM_CONTRACT",
+          "The individual listing response could not verify the requested listing state.",
+          502,
+        );
+      return {
+        id: parsed.data.offer.id,
+        state: parsed.data.offer.offerState,
+      };
     }
     throw new AppError(
       "ELDORADO_AUTH_FAILED",

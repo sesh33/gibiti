@@ -1,14 +1,14 @@
 # Secure deployment and operator setup
 
-This is a release checklist, not a claim that deployment has occurred. No Vercel deployment or hosted database migration has been performed. For a fully automated local database/Auth setup, use `npm run local` and [the localhost guide](localhost.md).
+The authorized hosted project is Vercel `rivox-control` and Supabase `dsfnqlwhexcjqanwnklz`. All 12 application migrations and their history are applied. Production reached `READY` at `https://rivox-control.vercel.app`: login HTTP 200, anonymous APIs HTTP 401, cross-origin mutation HTTP 403 and invalid-account login HTTP 401. CSP, HSTS, `DENY` frame protection and `nosniff` were confirmed. This is an HTTPS/access-control smoke check, not a successful commercial-write test. Local development is optional and is not required for employees.
 
 ## Supabase
 
 1. Use the private project `dsfnqlwhexcjqanwnklz` or a dedicated staging project first.
-2. Apply all SQL files in `supabase/migrations` in filename order using Supabase CLI migrations or the project's SQL Editor. Do not expose a generic SQL endpoint in the app. Local migration tests do not prove hosted application.
+2. The current hosted project already has all migrations through `202611020014_offer_availability.sql`, recorded in `supabase_migrations.schema_migrations`. Do not rerun the guarded first-install bundle against its occupied schema. Future changes must be forward migrations. There is no generic SQL endpoint in the app.
 3. Disable public sign-ups. Only invitations issued by the Owner should create membership. Set a strong password policy, email verification, appropriate Supabase Auth rate limits, session lifetime, and TOTP MFA enrollment/verification. Owner/Admin access is denied until the JWT has `aal2`.
-4. Configure production SMTP and allowed redirect URLs for the exact application origin. No email provider credentials are needed by the app; Supabase handles delivery.
-5. Set the hosted invitation email template link to the supported fragment-based confirmation flow (the fragment is removed before a same-origin POST, keeping invitation tokens out of app request URLs):
+4. Site URL and exact redirects are configured for `https://rivox-control.vercel.app`. The default Supabase email provider restricts recipients to project-team addresses. General SMTP delivery requires an operator-configured provider; Owner-issued private employee links do not depend on SMTP.
+5. The default provider's ordinary email link is supported: it opens the Owner setup page, clears the session fragment and asks for explicit acceptance before setting HTTP-only cookies. The original private setup tab then verifies the matching email before choosing a password. No email template customization is needed. With a custom SMTP provider, the following optional staff template also works:
 
    ```html
    <a
@@ -19,7 +19,7 @@ This is a release checklist, not a claim that deployment has occurred. No Vercel
 
    Set `.SiteURL` to the exact HTTPS deployment origin. The local Mailpit flow also supports Supabase's standard session fragment after explicit user acceptance; it is converted to verified HTTP-only cookies. The legacy token-hash confirmation route remains compatible.
 
-6. Create and verify the initial Owner Auth user in the Supabase dashboard. Then, in the SQL Editor, call `public.bootstrap_owner` with that user's UUID, email, and display name. This function is executable only by `service_role`/database administrators, succeeds only once, and creates an audit entry. Do not grant it to `authenticated` or `anon`.
+6. The intended Owner opens the operator's private, expiring setup handoff. The hosted mode requires `RIVOX_HOSTED_OWNER_SETUP=true`, `RIVOX_BOOTSTRAP_ENABLED=true`, an exact HTTPS origin, a strong private capability and an expiry of at most one hour. The user verifies their own email, chooses their own password/name and completes MFA. A verified session alone cannot claim ownership. `bootstrap_owner` remains server-only and single-Owner; no default identity is guessed.
 7. Sign in to RIVOX. The Owner is sent to MFA setup, then back to the workspace after verification. Test with a second account before inviting the wider team.
 8. Invite a trusted Admin reviewer. Access changes need a different authorized, MFA-verified reviewer; no requester or target may approve their own change. The sole Owner cannot bypass this control. Changes to that Admin require a different eligible reviewer.
 
@@ -39,7 +39,7 @@ Configure in the hosting provider's secure environment settings, never in tracke
 | `INVENTORY_ENCRYPTION_KEY`             | Optional raw 32-byte key encoded as 64 hex characters; requires secure runtime injection, not a proxy placeholder |
 | `RIVOX_DEV_MOCKS`                      | Defaults to false; true only for synthetic local development, always rejected in production                       |
 
-The cloud draft declares the Supabase service credential only for the supplied project's HTTPS hostname. An injected proxy binding is appropriate for HTTPS authentication. It is not suitable for a raw PostgreSQL connection password or a local encryption key. Do not infer missing credentials solely from CLI login status.
+Proxy-backed bindings are valid only at their configured destinations; they are not raw values that can be copied to another host. The project's Supabase keys were configured in Vercel through its authorized Management API. Its inventory key was generated once and stored encrypted; preserve it across deployments. Secure Eldorado-secret transfer still requires adding `api.vercel.com` to the existing `ELDORADO_CLIENT_SECRET` binding in environment settings, while retaining the Eldorado destinations. The draft tool cannot overwrite an existing target; do not create a duplicate binding as a workaround.
 
 Rebuild after public binding changes and restart after server binding changes. The app deliberately has no form that displays integration secret values.
 
@@ -60,7 +60,7 @@ The first-Owner form also supports an explicitly enabled temporary HTTPS session
 
 A private `#setup=…` capability is removed from browser history immediately and held only in component memory. It is submitted in the same-origin JSON body, never in a request URL or browser storage. The operator still chooses their own account/password and completes MFA. This mechanism does not provide a tunnel, hosting, durable storage, public SMTP, or availability after the environment stops. Use a production build with secure cookies for any externally accessible instance.
 
-The attempted isolated tunnel connectivity test was blocked before an address was issued. No public RIVOX URL was created or validated.
+The earlier isolated tunnel test was blocked before an address was issued. Hosted delivery uses the separately authorized Vercel project; no tunnel is required.
 
 ## Acceptance before commercial use
 

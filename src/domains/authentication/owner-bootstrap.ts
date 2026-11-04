@@ -8,6 +8,7 @@ export type OwnerBootstrapConfiguration = {
   origin?: string;
   expiresAt?: string;
   temporaryHttps?: string;
+  hostedSetup?: string;
   supabaseUrl?: string;
 };
 
@@ -18,6 +19,7 @@ export function bootstrapConfiguration(): OwnerBootstrapConfiguration {
     origin: process.env.APP_ORIGIN,
     expiresAt: process.env.RIVOX_BOOTSTRAP_EXPIRES_AT,
     temporaryHttps: process.env.RIVOX_TEMPORARY_HTTPS_SETUP,
+    hostedSetup: process.env.RIVOX_HOSTED_OWNER_SETUP,
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   };
 }
@@ -42,8 +44,13 @@ export function localOwnerSetupEnabled(
       origin.protocol === "https:" &&
       origin.origin === configuration.origin &&
       localSupabaseAccountCreationAllowed(configuration.supabaseUrl || "");
+    const hostedHttps =
+      configuration.hostedSetup === "true" &&
+      origin.protocol === "https:" &&
+      origin.origin === configuration.origin &&
+      hostedSupabaseSetupAllowed(configuration.supabaseUrl || "");
     if (
-      (!loopback && !temporaryHttps) ||
+      (!loopback && !temporaryHttps && !hostedHttps) ||
       origin.username ||
       origin.password ||
       origin.pathname !== "/" ||
@@ -62,6 +69,34 @@ export function localOwnerSetupEnabled(
   }
 }
 
+/** Hosted setup adds email proof; this flag never enables unverified account creation. */
+export function hostedOwnerSetupEnabled(
+  configuration = bootstrapConfiguration(),
+  now = Date.now(),
+): boolean {
+  return (
+    configuration.hostedSetup === "true" &&
+    configuration.origin?.startsWith("https://") === true &&
+    hostedSupabaseSetupAllowed(configuration.supabaseUrl || "") &&
+    localOwnerSetupEnabled(configuration, now)
+  );
+}
+
+function hostedSupabaseSetupAllowed(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.origin === url &&
+      /^[a-z0-9]+\.supabase\.co$/.test(parsed.hostname) &&
+      !parsed.username &&
+      !parsed.password
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Temporary HTTPS never enables bootstrap against a hosted Supabase project. */
 export function temporaryHttpsOwnerSetupEnabled(
   configuration = bootstrapConfiguration(),
@@ -70,6 +105,7 @@ export function temporaryHttpsOwnerSetupEnabled(
   return (
     configuration.temporaryHttps === "true" &&
     configuration.origin?.startsWith("https://") === true &&
+    localSupabaseAccountCreationAllowed(configuration.supabaseUrl || "") &&
     localOwnerSetupEnabled(configuration, now)
   );
 }
@@ -86,6 +122,37 @@ export function assertOwnerSetupAccess(
       "Owner setup is disabled or its private access has expired.",
       403,
     );
+  assertConfiguredSetupOrigin(request, configuration);
+  // Hash both values before comparing so no input-dependent token-length check is exposed.
+  const expected = createHash("sha256").update(configuration.token!).digest();
+  const supplied = createHash("sha256").update(suppliedToken).digest();
+  if (!timingSafeEqual(expected, supplied))
+    throw new AppError(
+      "OWNER_SETUP_UNAUTHORIZED",
+      "The private setup token was not accepted.",
+      401,
+    );
+}
+
+/** Establishes only a verified email session. It never authorizes Owner membership. */
+export function assertHostedOwnerEmailSessionAccess(
+  request: Request,
+  configuration = bootstrapConfiguration(),
+  now = Date.now(),
+): void {
+  if (!hostedOwnerSetupEnabled(configuration, now))
+    throw new AppError(
+      "HOSTED_OWNER_SETUP_DISABLED",
+      "Private Owner email verification is disabled or expired.",
+      403,
+    );
+  assertConfiguredSetupOrigin(request, configuration);
+}
+
+function assertConfiguredSetupOrigin(
+  request: Request,
+  configuration: OwnerBootstrapConfiguration,
+) {
   const expectedOrigin = new URL(configuration.origin!).origin;
   if (
     (request.headers.get("host") || new URL(request.url).host) !==
@@ -96,15 +163,6 @@ export function assertOwnerSetupAccess(
       "INVALID_ORIGIN",
       "Owner setup accepts requests only from its configured origin.",
       403,
-    );
-  // Hash both values before comparing so no input-dependent token-length check is exposed.
-  const expected = createHash("sha256").update(configuration.token!).digest();
-  const supplied = createHash("sha256").update(suppliedToken).digest();
-  if (!timingSafeEqual(expected, supplied))
-    throw new AppError(
-      "OWNER_SETUP_UNAUTHORIZED",
-      "The private setup token was not accepted.",
-      401,
     );
 }
 
@@ -191,6 +249,50 @@ export async function completeOwnerBootstrap(
     await dependencies.registerSession();
   } catch (error) {
     if (signedIn) await dependencies.signOut().catch(() => undefined);
+    throw error;
+  }
+}
+
+export type VerifiedOwnerBootstrapDependencies = {
+  ownerExists(): Promise<boolean>;
+  verifiedIdentity(): Promise<IntendedOwner | null>;
+  updatePassword(password: string): Promise<void>;
+  bootstrap(owner: { id: string; email: string; name: string }): Promise<void>;
+  registerSession(): Promise<void>;
+  signOut(): Promise<void>;
+};
+
+/** A private setup capability alone is insufficient: the hosted email must already be proven. */
+export async function completeVerifiedOwnerBootstrap(
+  input: { email: string; password: string; name: string },
+  dependencies: VerifiedOwnerBootstrapDependencies,
+): Promise<void> {
+  if (await dependencies.ownerExists())
+    throw new AppError(
+      "OWNER_ALREADY_EXISTS",
+      "This workspace already has an Owner. Sign in with your account.",
+      409,
+    );
+  const identity = await dependencies.verifiedIdentity();
+  try {
+    if (
+      !identity?.emailVerified ||
+      identity.email.toLowerCase() !== input.email.toLowerCase()
+    )
+      throw new AppError(
+        "OWNER_EMAIL_VERIFICATION_REQUIRED",
+        "Verify the code sent to your email before creating Owner access.",
+        401,
+      );
+    await dependencies.updatePassword(input.password);
+    await dependencies.bootstrap({
+      id: identity.id,
+      email: identity.email,
+      name: input.name,
+    });
+    await dependencies.registerSession();
+  } catch (error) {
+    if (identity) await dependencies.signOut().catch(() => undefined);
     throw error;
   }
 }

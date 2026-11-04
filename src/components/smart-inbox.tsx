@@ -108,6 +108,15 @@ export function SmartInbox({ configured }: { configured: boolean }) {
   });
   const connected = inbox.data?.provider === "official",
     isMock = inbox.data?.provider === "mock";
+  const canManageSettings =
+    !configured || Boolean(me.data?.permissions.includes("settings.manage"));
+  const canReadOrders =
+    !configured ||
+    Boolean(
+      me.data?.permissions.some((permission) =>
+        ["orders.read", "orders.read_assigned"].includes(permission),
+      ),
+    );
   const canCompose =
     Boolean(active) &&
     (connected || isMock) &&
@@ -249,18 +258,22 @@ export function SmartInbox({ configured }: { configured: boolean }) {
         title="Smart inbox"
         description="Every conversation. Full context. One focused workspace."
       >
-        <span className="pill pill-amber">
-          <span className="status-dot amber" />
+        <span className={`pill ${connected ? "pill-blue" : "pill-amber"}`}>
+          <span className={`status-dot ${connected ? "" : "amber"}`} />
           {isMock
             ? "Development fixtures"
-            : "Awaiting official messaging access"}
+            : connected
+              ? "Official messaging connected"
+              : "Awaiting official messaging access"}
         </span>
-        <Button variant="outline" asChild>
-          <Link href="/settings">
-            <SettingsIcon />
-            Integration settings
-          </Link>
-        </Button>
+        {canManageSettings && (
+          <Button variant="outline" asChild>
+            <Link href="/settings">
+              <SettingsIcon />
+              Integration settings
+            </Link>
+          </Button>
+        )}
       </PageHeading>
       <div className="inbox-toolbar">
         <div className="inbox-section-label">
@@ -381,16 +394,20 @@ export function SmartInbox({ configured }: { configured: boolean }) {
                 <strong>
                   {view.search
                     ? "No matching conversations"
-                    : "A quieter inbox starts here"}
+                    : connected
+                      ? "Your inbox is clear"
+                      : "A quieter inbox starts here"}
                 </strong>
                 <p>
                   {view.search
                     ? "Try another buyer, order, or product."
-                    : "Your buyer conversations will appear once an official messaging integration is connected."}
+                    : connected
+                      ? "No conversations match this view. Try another status or assignment filter."
+                      : "The Eldorado Seller API does not include buyer messages. A separate authorized messaging integration is required."}
                 </p>
                 <span className="mini-status">
-                  <span className="status-dot amber" />
-                  NOT CONNECTED
+                  <span className={`status-dot ${connected ? "" : "amber"}`} />
+                  {connected ? "CONNECTED" : "NOT CONNECTED"}
                 </span>
               </div>
             )}
@@ -429,11 +446,18 @@ export function SmartInbox({ configured }: { configured: boolean }) {
             <span>
               {isMock
                 ? "Development fixtures only. No messages are exchanged with Eldorado."
-                : "Live messaging is locked until Eldorado provides an authorized integration."}
+                : connected
+                  ? "Replies use the authorized messaging provider. Your Eldorado credentials remain private."
+                  : "Eldorado excludes messages from its Seller API. Buyer replies need separate official messaging access."}
             </span>
-            <Link href="/settings">
+            <a
+              href="https://support.eldorado.gg/en/articles/16127288-how-the-seller-api-works"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Read Eldorado's official Seller API capabilities"
+            >
               <ArrowUpRight size={13} />
-            </Link>
+            </a>
           </div>
           <div className="message-history" aria-live="polite">
             {active ? (
@@ -487,11 +511,23 @@ export function SmartInbox({ configured }: { configured: boolean }) {
                 <p>
                   Your conversations and order context belong together.
                   <br />
-                  Connect authorized messaging to bring them here.
+                  {connected
+                    ? "Choose a conversation from your inbox to start working."
+                    : "The Seller API connects orders and offers. Messaging requires separate official access."}
                 </p>
-                <Link href="/settings" className="empty-link">
-                  View integration requirements <ArrowUpRight size={13} />
-                </Link>
+                {canReadOrders && !connected ? (
+                  <Link href="/orders" className="empty-link">
+                    Continue in order center <ArrowUpRight size={13} />
+                  </Link>
+                ) : canManageSettings ? (
+                  <Link href="/settings" className="empty-link">
+                    View integration requirements <ArrowUpRight size={13} />
+                  </Link>
+                ) : (
+                  <span className="inbox-owner-note">
+                    Your Owner manages integration access.
+                  </span>
+                )}
                 <div className="workspace-empty-features">
                   <span>
                     <CheckCheck size={13} /> Shared context
@@ -510,7 +546,11 @@ export function SmartInbox({ configured }: { configured: boolean }) {
               </strong>
               <span>
                 <LockKeyhole size={11} />
-                {isMock ? "Development only" : "Not connected"}
+                {isMock
+                  ? "Development only"
+                  : connected
+                    ? "Authorized provider"
+                    : "Not connected"}
               </span>
             </div>
             <textarea

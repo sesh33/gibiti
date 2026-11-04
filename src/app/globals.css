@@ -2531,3 +2531,318 @@ input[type="checkbox"] {
 .role-profiles-panel > .state-badge {
   margin: 5px;
 }
+.readiness-banner {
+  margin-bottom: 20px;
+  padding: 25px;
+  border: 1px solid #36599266;
+  border-radius: 11px;
+  background:
+    radial-gradient(ellipse at 95% 0%, #4776ff12, transparent 65%),
+    linear-gradient(120deg, #121d30, #0e1726);
+}
+.readiness-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+.readiness-shield {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  color: #a9c2ff;
+  background: #527bff16;
+  border: 1px solid #628aff38;
+  border-radius: 12px;
+}
+.readiness-intro .eyebrow {
+  color: #829ac2;
+  letter-spacing: 1.2px;
+  font-size: 10px;
+}
+.readiness-intro h2 {
+  color: #d2e0f6;
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 550;
+  letter-spacing: -0.25px;
+  margin: 6px 0;
+}
+.readiness-intro p {
+  color: #8c9fb9;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.readiness-checks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+.readiness-checks > div {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 13px;
+  background: #0c142266;
+  border: 1px solid #2b426255;
+  border-radius: 7px;
+  color: #839ab9;
+  font-size: 11px;
+}
+.readiness-checks strong {
+  grid-column: 2;
+  color: #c4d6f0;
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.inbox-owner-note {
+  color: #8a9bb5;
+  font-size: 12px;
+  line-height: 1.7;
+}
+@media (max-width: 680px) {
+  .readiness-banner {
+    padding: 18px;
+  }
+  .readiness-intro {
+    gap: 11px;
+  }
+  .readiness-shield {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+  }
+  .readiness-intro h2 {
+    font-size: 15px;
+  }
+  .readiness-checks {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .readiness-checks > div {
+    grid-template-columns: 8px minmax(0, 1fr) minmax(0, 1fr);
+    padding: 11px;
+  }
+  .readiness-checks strong {
+    grid-column: 3;
+    text-align: right;
+  }
+}
+
+/* Catalog controls: individual, confirmed availability changes. */
+.catalog-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 21px 0;
+}
+.catalog-summary > div {
+  padding: 18px 20px;
+  background: linear-gradient(125deg, #152033, #101923);
+  border: 1px solid #2c3e58;
+  border-radius: 9px;
+}
+.catalog-summary > div > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #859dbc;
+}
+.catalog-summary strong {
+  display: block;
+  margin: 11px 0 7px;
+  color: #d0e1f9;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 550;
+  letter-spacing: -1px;
+}
+.catalog-summary small {
+  color: #6e87aa;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.catalog-status-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: #73bda7;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #71b8a533;
+}
+.catalog-control-cell {
+  min-width: 160px;
+}
+.catalog-control-cell .button {
+  white-space: nowrap;
+}
+.catalog-control-cell small {
+  margin-top: 7px;
+  font-size: 9px;
+  max-width: 175px;
+  line-height: 1.6;
+}
+.catalog-control-cell small.catalog-verified {
+  color: #8fbaa9;
+}
+.catalog-read-only {
+  font-size: 11px;
+  color: #7387a2;
+}
+.catalog-pending-panel {
+  margin: 18px 0;
+  border: 1px solid #8d75433d;
+  background: #b38a2910;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.catalog-pending-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 15px;
+  color: #c6b283;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.catalog-pending-notice svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.catalog-pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 11px 15px;
+  border-top: 1px solid #9b7c3833;
+}
+.catalog-pending-row > div {
+  min-width: 0;
+}
+.catalog-pending-row strong,
+.catalog-pending-row code {
+  display: block;
+  font-size: 11px;
+  color: #c0bba8;
+  line-height: 1.6;
+  font-weight: 450;
+  overflow-wrap: anywhere;
+}
+.catalog-pending-row code {
+  font-size: 9px;
+  color: #8b92a2;
+}
+.catalog-pending-row .button {
+  flex-shrink: 0;
+}
+.catalog-change-summary {
+  padding: 17px;
+  margin: 19px 0;
+  border: 1px solid #344b6b;
+  border-radius: 8px;
+  background: #0c1728;
+}
+.catalog-change-summary > strong {
+  display: block;
+  color: #c2d7f2;
+  font-size: 13px;
+  line-height: 1.8;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.catalog-change-summary > code {
+  display: block;
+  color: #718dad;
+  font-size: 10px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  margin-bottom: 13px;
+}
+.catalog-change-summary > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 6px 0;
+  color: #7892b4;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.catalog-change-summary b {
+  color: #b0c6e1;
+  font-weight: 450;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.catalog-confirm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.catalog-confirm-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.catalog-confirm-form .checkbox-label {
+  line-height: 1.9;
+  align-items: flex-start;
+}
+.catalog-confirm-form .checkbox-label input {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.catalog-outcome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c6b282;
+  font-size: 13px;
+}
+.catalog-outcome.is-verified {
+  color: #93c6b2;
+}
+.catalog-operation-result > p {
+  font-size: 12px;
+  color: #879ebd;
+  line-height: 1.9;
+  margin: 14px 0;
+  overflow-wrap: anywhere;
+}
+.catalog-operation-result .catalog-recovery-note {
+  font-size: 10px;
+  color: #6f85a3;
+}
+.catalog-coverage-note {
+  margin-top: 9px;
+}
+@media (max-width: 680px) {
+  .catalog-summary {
+    gap: 8px;
+  }
+  .catalog-summary > div {
+    padding: 13px 11px;
+  }
+  .catalog-summary > div > span {
+    letter-spacing: 0.4px;
+    font-size: 8px;
+  }
+  .catalog-summary strong {
+    font-size: 23px;
+  }
+  .catalog-summary small {
+    font-size: 9px;
+  }
+  .catalog-pending-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}

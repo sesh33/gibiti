@@ -9,6 +9,7 @@ import {
   KeyRound,
   LockKeyhole,
   MessageSquare,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -36,10 +37,16 @@ export function Settings({ configured }: { configured: boolean }) {
         messaging: boolean;
         database: boolean;
         liveWrites: boolean;
+        availabilityActions: boolean;
         errors: { provider: string; code: string; created_at: string }[];
       }>("/api/workspace/settings"),
     enabled: configured,
+    refetchInterval: 60000,
+    retry: false,
   });
+  const databaseVerified = status.data?.database === true;
+  const ordersVerified = status.data?.eldoradoVerified === true;
+  const offerSources = status.data?.offersVerifiedSources ?? [];
   async function copy(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -54,7 +61,60 @@ export function Settings({ configured }: { configured: boolean }) {
         eyebrow="WORKSPACE CONFIGURATION"
         title="Connected carefully. Controlled completely."
         description="Server-side credentials, explicit capabilities, and a clear integration status."
-      />
+      >
+        <Button
+          variant="outline"
+          onClick={() => status.refetch()}
+          disabled={!configured || status.isFetching}
+        >
+          <RefreshCw size={14} className={status.isFetching ? "spin" : ""} />
+          {status.isFetching ? "Refreshing..." : "Refresh status"}
+        </Button>
+      </PageHeading>
+      <section className="readiness-banner" aria-label="Workspace readiness">
+        <div className="readiness-intro">
+          <span className="readiness-shield">
+            <ShieldCheck size={23} />
+          </span>
+          <div>
+            <span className="eyebrow">ONE WORKSPACE. INDIVIDUAL ACCESS.</span>
+            <h2>Your team works here. Your credentials stay private.</h2>
+            <p>
+              Every employee signs in with their own account and works within
+              the permissions you grant.
+            </p>
+          </div>
+        </div>
+        <div className="readiness-checks">
+          <div>
+            <span className={`status-dot ${databaseVerified ? "" : "amber"}`} />
+            <span>Database session</span>
+            <strong>
+              {databaseVerified
+                ? "Verified"
+                : status.isFetching
+                  ? "Checking"
+                  : "Not verified"}
+            </strong>
+          </div>
+          <div>
+            <span className={`status-dot ${ordersVerified ? "" : "amber"}`} />
+            <span>Order synchronization</span>
+            <strong>
+              {ordersVerified ? "Success recorded" : "Awaiting first sync"}
+            </strong>
+          </div>
+          <div>
+            <span
+              className={`status-dot ${status.data?.messaging ? "" : "amber"}`}
+            />
+            <span>Buyer messaging</span>
+            <strong>
+              {status.data?.messaging ? "Connected" : "Authorization required"}
+            </strong>
+          </div>
+        </div>
+      </section>
       <div className="settings-grid">
         <section className="data-panel settings-section">
           <div className="settings-heading">
@@ -65,29 +125,53 @@ export function Settings({ configured }: { configured: boolean }) {
               <h2>Identity & database</h2>
               <p>Supabase PostgreSQL, Auth, and Row Level Security.</p>
             </div>
-            <span className={`pill ${configured ? "pill-blue" : "pill-amber"}`}>
-              {configured ? "Configuration present" : "Setup required"}
+            <span
+              className={`pill ${databaseVerified ? "pill-blue" : "pill-amber"}`}
+            >
+              {databaseVerified
+                ? "Session verified"
+                : configured
+                  ? "Configuration present"
+                  : "Setup required"}
             </span>
           </div>
-          <ol className="setup-steps">
-            <li>
-              Create a Supabase project and apply the versioned migrations.
-            </li>
-            <li>
-              Disable public sign-ups, configure SMTP and the invite
-              confirmation template.
-            </li>
-            <li>
-              Create your Owner account, run the documented one-time bootstrap,
-              and enroll MFA.
-            </li>
-            <li>
-              Configure the secure environment variables and restart the app.
-            </li>
-          </ol>
+          {databaseVerified ? (
+            <div className="capability-list">
+              <div>
+                <span>Authenticated database access</span>
+                <span className="pill pill-blue">Verified</span>
+              </div>
+              <div>
+                <span>Staff access</span>
+                <span>Individual accounts</span>
+              </div>
+              <div>
+                <span>Privileged access</span>
+                <span>Authenticator required</span>
+              </div>
+            </div>
+          ) : (
+            <ol className="setup-steps">
+              <li>
+                Create a Supabase project and apply the versioned migrations.
+              </li>
+              <li>
+                Disable public sign-ups, configure SMTP and the invite
+                confirmation template.
+              </li>
+              <li>
+                Create your Owner account, run the documented one-time
+                bootstrap, and enroll MFA.
+              </li>
+              <li>
+                Configure the secure environment variables and restart the app.
+              </li>
+            </ol>
+          )}
           <p className="scope-note">
-            Configuration presence does not prove connectivity. Database and
-            authentication readiness require live validation.
+            {databaseVerified
+              ? "This status was returned by your authenticated database session. Access is enforced on the server and by database policies."
+              : "Configuration presence does not prove connectivity. Database and authentication readiness require live validation."}
           </p>
         </section>
         <section className="data-panel settings-section">
@@ -106,29 +190,61 @@ export function Settings({ configured }: { configured: boolean }) {
           <div className="capability-list">
             <div>
               <span>Order synchronization</span>
-              <span className="pill pill-amber">
-                {status.data?.eldorado
-                  ? "Credentials present · unverified"
-                  : "Credentials required"}
+              <span
+                className={`pill ${ordersVerified ? "pill-blue" : "pill-amber"}`}
+              >
+                {ordersVerified
+                  ? "Successful sync recorded"
+                  : status.data?.eldorado
+                    ? "Ready for first sync"
+                    : "Credentials required"}
+              </span>
+            </div>
+            <div>
+              <span>Offer synchronization</span>
+              <span
+                className={`pill ${offerSources.length ? "pill-blue" : "pill-muted"}`}
+              >
+                {offerSources.length
+                  ? `${offerSources.length} verified ${offerSources.length === 1 ? "source" : "sources"}`
+                  : "Awaiting first sync"}
               </span>
             </div>
             <div>
               <span>Messaging</span>
-              <span className="pill pill-amber">
-                Awaiting authorized access
+              <span
+                className={`pill ${status.data?.messaging ? "pill-blue" : "pill-amber"}`}
+              >
+                {status.data?.messaging
+                  ? "Authorized provider connected"
+                  : "Excluded from Seller API"}
               </span>
             </div>
             <div>
-              <span>Live order / offer writes</span>
-              <span className="pill pill-muted">
-                Contract verification required
+              <span>Individual listing pause / resume</span>
+              <span
+                className={`pill ${status.data?.availabilityActions ? "pill-blue" : "pill-muted"}`}
+              >
+                {status.data?.availabilityActions
+                  ? "Available after synchronization"
+                  : "Seller credentials required"}
+              </span>
+            </div>
+            <div>
+              <span>Delivery, price and quantity changes</span>
+              <span
+                className={`pill ${status.data?.liveWrites ? "pill-blue" : "pill-muted"}`}
+              >
+                {status.data?.liveWrites
+                  ? "Authorized operations enabled"
+                  : "Contract verification required"}
               </span>
             </div>
           </div>
           <p>
             Client credentials are exchanged for a short-lived access token only
-            on the server. The token is renewed before expiration. No real
-            mutation is performed during setup.
+            on the server. Individual listing changes require permission,
+            confirmation and a verified result from Eldorado.
           </p>
           <Button variant="outline" asChild>
             <a
@@ -187,20 +303,29 @@ export function Settings({ configured }: { configured: boolean }) {
             </span>
             <div>
               <h2>Official messaging access</h2>
-              <p>Blocked by external authorization.</p>
+              <p>Separate from the Seller API.</p>
             </div>
           </div>
           <p>
-            The order&apos;s <code>talkJsConversationId</code> is a reference,
-            not a credential. An authorized Eldorado messaging contract or
-            provisioned SDK access is required before reading or sending real
-            messages.
+            Eldorado&apos;s Seller API supports offers and orders. Its official
+            documentation excludes messages, disputes, and feedback from that
+            API. Seller credentials alone cannot enable buyer replies here.
           </p>
           <p>
-            Ask Eldorado support whether seller messaging APIs, scoped TalkJS
-            credentials, or message webhooks are available. No browser cookies
-            or undocumented endpoints are used.
+            The order&apos;s <code>talkJsConversationId</code> is a reference,
+            not a messaging credential. A separate authorized integration must
+            be confirmed with Eldorado before real conversations can be
+            connected.
           </p>
+          <Button variant="outline" asChild>
+            <a
+              href="https://support.eldorado.gg/en/articles/16127288-how-the-seller-api-works"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Eldorado API capabilities <ArrowUpRight size={13} />
+            </a>
+          </Button>
         </section>
         <section className="data-panel settings-section">
           <div className="settings-heading">

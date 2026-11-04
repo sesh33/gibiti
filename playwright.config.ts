@@ -13,7 +13,7 @@ export default defineConfig({
     launchOptions: { executablePath, args: ["--no-sandbox"] },
   },
   webServer: {
-    command: "npm run dev -- --port 3100",
+    command: "npm run dev -- --webpack --port 3100",
     url: "http://127.0.0.1:3100",
     reuseExistingServer: false,
     timeout: 60000,

@@ -6,6 +6,7 @@ import { api } from "@/lib/api-client";
 import {
   roles,
   permissions,
+  type Permission,
   type Role,
 } from "@/domains/authorization/permissions";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,21 @@ export type RoleProfile = {
   name: string;
   base_role: Role;
   overrides: { permission: string; allowed: boolean }[];
+};
+export const catalogOperatorPreset = {
+  name: "Catalog operator",
+  baseRole: "SUPPORT_AGENT",
+  overrides: [
+    { permission: "offers.read", allowed: true },
+    { permission: "offers.pause", allowed: true },
+    { permission: "conversations.read", allowed: false },
+    { permission: "conversations.reply", allowed: false },
+    { permission: "conversations.internal_notes", allowed: false },
+  ],
+} as const satisfies {
+  name: string;
+  baseRole: Role;
+  overrides: readonly { permission: Permission; allowed: boolean }[];
 };
 export function RoleProfiles({ configured }: { configured: boolean }) {
   const cache = useQueryClient(),
@@ -106,6 +122,32 @@ export function RoleProfiles({ configured }: { configured: boolean }) {
               save.mutate();
             }}
           >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={save.isPending}
+              onClick={() => {
+                setName(catalogOperatorPreset.name);
+                setBase(catalogOperatorPreset.baseRole);
+                setChanges(
+                  Object.fromEntries(
+                    catalogOperatorPreset.overrides.map((override) => [
+                      override.permission,
+                      override.allowed ? "allow" : "deny",
+                    ]),
+                  ),
+                );
+              }}
+            >
+              <ShieldCheck size={13} />
+              Use Catalog operator preset
+            </Button>
+            <p className="scope-note">
+              This preset allows listing reads and pause or resume, retains
+              assigned-order access, and disables messaging. Save the profile
+              first. Employee assignment requires independent review.
+            </p>
             <label className="field-label">
               Role name
               <input

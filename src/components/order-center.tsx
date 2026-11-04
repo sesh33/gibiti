@@ -15,6 +15,7 @@ import { PageHeading } from "@/components/page-heading";
 import { EmptyState, QueryError } from "@/components/empty-state";
 import { api } from "@/lib/api-client";
 import { money } from "@/lib/utils";
+import { orderStateOptions } from "@/domains/orders/states";
 export type OrderRow = {
   id: string;
   buyer_username: string;
@@ -39,9 +40,12 @@ export function OrderCenter({ configured }: { configured: boolean }) {
   const orders = useQuery({
     queryKey: ["orders", params.toString()],
     queryFn: () =>
-      api<{ items: OrderRow[]; nextCursor: string | null; scope: string }>(
-        `/api/orders?${params}`,
-      ),
+      api<{
+        items: OrderRow[];
+        nextCursor: string | null;
+        observedStates?: string[];
+        scope: string;
+      }>(`/api/orders?${params}`),
     enabled: configured,
     refetchInterval: 60000,
   });
@@ -126,12 +130,12 @@ export function OrderCenter({ configured }: { configured: boolean }) {
             >
               {[
                 "all",
-                "Paid",
-                "InProgress",
-                "Delivered",
-                "Completed",
-                "Canceled",
-                "Disputed",
+                ...orderStateOptions(
+                  orders.data?.observedStates ??
+                    orders.data?.items.map((order) => order.state) ??
+                    [],
+                  state,
+                ),
               ].map((value) => (
                 <option value={value} key={value}>
                   {value === "all" ? "All statuses" : value}

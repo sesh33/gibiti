@@ -64,7 +64,7 @@ export async function POST(request: Request) {
           (profile.role === "OWNER" || profile.role === "ADMIN") &&
           assurance?.currentLevel !== "aal2"
             ? "/mfa"
-            : "/inbox",
+            : "/",
       },
       { headers: { "Cache-Control": "no-store" } },
     );

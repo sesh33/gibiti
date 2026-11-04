@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const input = z
       .object({
         search: z.string().max(100).default(""),
-        state: z.string().max(40).default("all"),
+        state: z.string().max(200).default("all"),
         cursor: z.string().max(300).optional(),
         sort: z.enum(["newest", "oldest"]).default("newest"),
       })
@@ -64,6 +64,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         items,
+        observedStates: [...new Set(items.map((item) => item.state))].sort(),
         nextCursor:
           rows.length > 50 && last
             ? Buffer.from(

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { RoleProfiles, type RoleProfile } from "@/components/role-profiles";
 import { InventoryActions } from "@/components/inventory-actions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Layers3, Plus, ShieldCheck, X } from "lucide-react";
+import { Check, Copy, Layers3, Plus, ShieldCheck, X } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { money } from "@/lib/utils";
 import {
@@ -71,7 +71,27 @@ export function TeamModule({ configured }: { configured: boolean }) {
     [notice, setNotice] = useState(""),
     [changeReason, setChangeReason] = useState(""),
     [requestKey, setRequestKey] = useState(""),
-    [roleProfileId, setRoleProfileId] = useState("");
+    [roleProfileId, setRoleProfileId] = useState(""),
+    [delivery, setDelivery] = useState<"link" | "email">("link"),
+    [privateInvitation, setPrivateInvitation] = useState<{
+      url: string;
+      email: string;
+    } | null>(null),
+    [copied, setCopied] = useState(false);
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: () =>
+      api<{ profile: { id: string; role: Role }; permissions: string[] }>(
+        "/api/me",
+      ),
+    enabled: configured,
+  });
+  const canInvite =
+    me.data?.profile.role === "OWNER" &&
+    me.data.permissions.includes("team.invite");
+  const canManage = Boolean(
+    me.data?.permissions.includes("team.manage_permissions"),
+  );
   const profiles = useQuery({
     queryKey: ["role-profiles"],
     queryFn: () => api<{ items: RoleProfile[] }>("/api/team/roles"),
@@ -84,40 +104,67 @@ export function TeamModule({ configured }: { configured: boolean }) {
     enabled: configured,
   });
   const mutation = useMutation({
-    mutationFn: () =>
-      editing
-        ? api(`/api/team/${editing.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({
-              role,
-              ...(roleProfileId ? { roleProfileId } : {}),
-              active,
-              reason: changeReason,
-              idempotencyKey: requestKey,
-              overrides: Object.entries(overrides)
-                .filter(([, value]) => value !== "default")
-                .map(([permission, value]) => ({
-                  permission,
-                  allowed: value === "allow",
-                })),
-            }),
-          })
-        : api("/api/team", {
-            method: "POST",
-            body: JSON.stringify({ name, email, role }),
+    mutationFn: async () => {
+      if (editing) {
+        await api(`/api/team/${editing.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            role,
+            ...(roleProfileId ? { roleProfileId } : {}),
+            active,
+            reason: changeReason,
+            idempotencyKey: requestKey,
+            overrides: Object.entries(overrides)
+              .filter(([, value]) => value !== "default")
+              .map(([permission, value]) => ({
+                permission,
+                allowed: value === "allow",
+              })),
           }),
-    onSuccess: () => {
-      setOpen(false);
+        });
+        return { kind: "access" as const };
+      }
+      const result = await api<{
+        delivery: "link" | "email";
+        inviteUrl?: string;
+      }>("/api/team", {
+        method: "POST",
+        body: JSON.stringify({ name, email, role, delivery }),
+      });
+      if (result.delivery === "link") {
+        const url = new URL(result.inviteUrl || "");
+        if (
+          url.origin !== window.location.origin ||
+          url.pathname !== "/account/setup" ||
+          !url.hash
+        )
+          throw new Error(
+            "The private invitation could not be displayed. Reconcile the employee account before retrying.",
+          );
+        setPrivateInvitation({ url: url.href, email });
+      }
+      // The bearer capability stays only in component memory, never in mutation/query cache.
+      return { kind: "invite" as const, delivery: result.delivery };
+    },
+    onSuccess: (result) => {
+      if (result.kind === "access" || result.delivery === "email")
+        setOpen(false);
       setNotice(
-        editing
+        result.kind === "access"
           ? "Access change requested. A distinct authorized reviewer must approve it before permissions change."
-          : "Invitation sent. The employee will use their own login.",
+          : result.delivery === "link"
+            ? "Private invitation ready. Copy it before closing and share it only with the employee."
+            : "Invitation sent. The employee will use their own login.",
       );
       cache.invalidateQueries({ queryKey: ["team"] });
     },
     onError: (e) => setNotice(e.message),
   });
   function invite() {
+    mutation.reset();
+    setPrivateInvitation(null);
+    setCopied(false);
+    setDelivery("link");
     setRoleProfileId("");
     setEditing(null);
     setName("");
@@ -126,6 +173,9 @@ export function TeamModule({ configured }: { configured: boolean }) {
     setOpen(true);
   }
   function edit(user: Staff) {
+    mutation.reset();
+    setPrivateInvitation(null);
+    setCopied(false);
     setRoleProfileId("");
     setRequestKey(crypto.randomUUID());
     setChangeReason("");
@@ -150,7 +200,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
         title="Your team. Your rules."
         description="Individual accounts. Explicit permissions. No shared seller passwords."
       >
-        <Button onClick={invite} disabled={!configured}>
+        <Button onClick={invite} disabled={!configured || !canInvite}>
           <Plus size={14} />
           Invite employee
         </Button>
@@ -207,6 +257,11 @@ export function TeamModule({ configured }: { configured: boolean }) {
                         <Button
                           size="sm"
                           variant="ghost"
+                          disabled={
+                            !canManage ||
+                            user.role === "OWNER" ||
+                            user.id === me.data?.profile.id
+                          }
                           onClick={() => edit(user)}
                         >
                           Manage access
@@ -228,151 +283,239 @@ export function TeamModule({ configured }: { configured: boolean }) {
         )}
       </section>
       <RoleProfiles configured={configured} />
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (mutation.isPending) return;
+          setOpen(next);
+          if (!next) {
+            setPrivateInvitation(null);
+            setCopied(false);
+            mutation.reset();
+          }
+        }}
+      >
         <DialogContent>
           <DialogTitle>
-            {editing ? "Manage employee access" : "Invite an employee"}
+            {privateInvitation
+              ? "Your private invitation is ready."
+              : editing
+                ? "Manage employee access"
+                : "Invite an employee"}
           </DialogTitle>
           <DialogDescription>
-            {editing
-              ? "A distinct authorized reviewer must approve access changes. You cannot change your own permissions or the Owner."
-              : "An invitation will be sent by Supabase Auth. Only the Owner can assign an initial role."}
+            {privateInvitation
+              ? "Copy this single-use link now and share it privately with the intended employee. The employee accepts it and chooses their own password."
+              : editing
+                ? "A distinct authorized reviewer must approve access changes. You cannot change your own permissions or the Owner."
+                : "Choose a private invitation link or email delivery. Only the Owner can assign an initial role."}
           </DialogDescription>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              mutation.mutate();
-            }}
-          >
-            {!editing && (
-              <>
-                <label className="field-label">
-                  Full name
-                  <input
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    maxLength={100}
-                  />
-                </label>
-                <label className="field-label">
-                  Email address
-                  <input
-                    required
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </label>
-              </>
-            )}
-            {editing && (
+          {privateInvitation ? (
+            <section>
+              <p className="scope-note">
+                For {privateInvitation.email}. This link is shown only in this
+                dialog and expires according to the invitation policy.
+              </p>
               <label className="field-label">
-                Saved custom role
-                <select
-                  value={roleProfileId}
-                  onChange={(e) => {
-                    setRoleProfileId(e.target.value);
-                    const profile = profiles.data?.items.find(
-                      (item) => item.id === e.target.value,
+                Private invitation link
+                <input
+                  readOnly
+                  autoComplete="off"
+                  value={privateInvitation.url}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+              </label>
+              <Button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(privateInvitation.url);
+                    setCopied(true);
+                  } catch {
+                    setNotice(
+                      "Clipboard access is unavailable. Select and copy the private link manually.",
                     );
-                    if (profile) {
-                      setRole(profile.base_role);
-                      setOverrides(
-                        Object.fromEntries(
-                          profile.overrides.map((item) => [
-                            item.permission,
-                            item.allowed ? "allow" : "deny",
-                          ]),
-                        ),
+                  }
+                }}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? "Copied" : "Copy private link"}
+              </Button>
+              <p className="scope-note">
+                Treat this link as a temporary password. It creates access to
+                the employee&apos;s assigned RIVOX role.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPrivateInvitation(null);
+                  setCopied(false);
+                  setOpen(false);
+                  mutation.reset();
+                }}
+              >
+                Done
+              </Button>
+            </section>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                mutation.mutate();
+              }}
+            >
+              {!editing && (
+                <>
+                  <label className="field-label">
+                    Full name
+                    <input
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      maxLength={100}
+                    />
+                  </label>
+                  <label className="field-label">
+                    Email address
+                    <input
+                      required
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </label>
+                  <label className="field-label">
+                    Invitation delivery
+                    <select
+                      value={delivery}
+                      onChange={(event) =>
+                        setDelivery(event.target.value as "link" | "email")
+                      }
+                    >
+                      <option value="link">
+                        Private link — share it yourself
+                      </option>
+                      <option value="email">Send invitation by email</option>
+                    </select>
+                  </label>
+                  <p className="scope-note">
+                    {delivery === "link"
+                      ? "A private link works without an email provider. Copy it once and deliver it through a trusted channel."
+                      : "Email delivery depends on the configured email provider. If it is unavailable, use a private link."}
+                  </p>
+                </>
+              )}
+              {editing && (
+                <label className="field-label">
+                  Saved custom role
+                  <select
+                    value={roleProfileId}
+                    onChange={(e) => {
+                      setRoleProfileId(e.target.value);
+                      const profile = profiles.data?.items.find(
+                        (item) => item.id === e.target.value,
                       );
-                    }
-                  }}
+                      if (profile) {
+                        setRole(profile.base_role);
+                        setOverrides(
+                          Object.fromEntries(
+                            profile.overrides.map((item) => [
+                              item.permission,
+                              item.allowed ? "allow" : "deny",
+                            ]),
+                          ),
+                        );
+                      }
+                    }}
+                  >
+                    <option value="">Individual configuration</option>
+                    {profiles.data?.items.map((profile) => (
+                      <option value={profile.id} key={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label className="field-label">
+                Role
+                <select
+                  value={role}
+                  disabled={Boolean(roleProfileId)}
+                  onChange={(e) => setRole(e.target.value as Role)}
                 >
-                  <option value="">Individual configuration</option>
-                  {profiles.data?.items.map((profile) => (
-                    <option value={profile.id} key={profile.id}>
-                      {profile.name}
-                    </option>
-                  ))}
+                  {roles
+                    .filter((r) => r !== "OWNER")
+                    .map((r) => (
+                      <option key={r} value={r}>
+                        {r.replaceAll("_", " ")}
+                      </option>
+                    ))}
                 </select>
               </label>
-            )}
-            <label className="field-label">
-              Role
-              <select
-                value={role}
-                disabled={Boolean(roleProfileId)}
-                onChange={(e) => setRole(e.target.value as Role)}
-              >
-                {roles
-                  .filter((r) => r !== "OWNER")
-                  .map((r) => (
-                    <option key={r} value={r}>
-                      {r.replaceAll("_", " ")}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            {editing && (
-              <>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={active}
-                    onChange={(e) => setActive(e.target.checked)}
-                  />
-                  Account active
-                </label>
-                <details
-                  className="permission-editor"
-                  inert={Boolean(roleProfileId)}
-                >
-                  <summary>Individual permission overrides</summary>
-                  {permissions.map((permission) => (
-                    <label key={permission}>
-                      {permission}
-                      <select
-                        value={overrides[permission] ?? "default"}
-                        onChange={(e) =>
-                          setOverrides({
-                            ...overrides,
-                            [permission]: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="default">Role default</option>
-                        <option value="allow">Allow</option>
-                        <option value="deny">Deny</option>
-                      </select>
-                    </label>
-                  ))}
-                </details>
-                <label className="field-label">
-                  Reason for the access change
-                  <textarea
-                    required
-                    minLength={10}
-                    maxLength={2000}
-                    value={changeReason}
-                    onChange={(e) => setChangeReason(e.target.value)}
-                  />
-                </label>
-              </>
-            )}
-            <Button disabled={mutation.isPending} type="submit">
-              {mutation.isPending
-                ? "Saving..."
-                : editing
-                  ? "Request access change"
-                  : "Send invitation"}
-            </Button>
-            {mutation.isError && (
-              <p role="alert" className="form-error">
-                {mutation.error.message}
-              </p>
-            )}
-          </form>
+              {editing && (
+                <>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={(e) => setActive(e.target.checked)}
+                    />
+                    Account active
+                  </label>
+                  <details
+                    className="permission-editor"
+                    inert={Boolean(roleProfileId)}
+                  >
+                    <summary>Individual permission overrides</summary>
+                    {permissions.map((permission) => (
+                      <label key={permission}>
+                        {permission}
+                        <select
+                          value={overrides[permission] ?? "default"}
+                          onChange={(e) =>
+                            setOverrides({
+                              ...overrides,
+                              [permission]: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="default">Role default</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </label>
+                    ))}
+                  </details>
+                  <label className="field-label">
+                    Reason for the access change
+                    <textarea
+                      required
+                      minLength={10}
+                      maxLength={2000}
+                      value={changeReason}
+                      onChange={(e) => setChangeReason(e.target.value)}
+                    />
+                  </label>
+                </>
+              )}
+              <Button disabled={mutation.isPending} type="submit">
+                {mutation.isPending
+                  ? "Saving..."
+                  : editing
+                    ? "Request access change"
+                    : delivery === "link"
+                      ? "Create private invitation"
+                      : "Send invitation"}
+              </Button>
+              {mutation.isError && (
+                <p role="alert" className="form-error">
+                  {mutation.error.message}
+                </p>
+              )}
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </>

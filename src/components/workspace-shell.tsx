@@ -29,16 +29,10 @@ import {
 } from "@/components/ui/dialog";
 const navigation = [
   {
-    label: "Overview",
-    href: "/overview",
-    icon: Gauge,
-    permission: "analytics.read",
-  },
-  {
-    label: "Smart inbox",
-    href: "/inbox",
-    icon: Inbox,
-    permission: "conversations.read",
+    label: "Offers",
+    href: "/offers",
+    icon: Layers3,
+    permission: "offers.read",
   },
   {
     label: "Order center",
@@ -47,16 +41,16 @@ const navigation = [
     permission: "orders.read_assigned",
   },
   {
-    label: "Offers",
-    href: "/offers",
-    icon: Layers3,
-    permission: "offers.read",
-  },
-  {
     label: "Inventory",
     href: "/inventory",
     icon: Box,
     permission: "inventory.read",
+  },
+  {
+    label: "Overview",
+    href: "/overview",
+    icon: Gauge,
+    permission: "analytics.read",
   },
   { label: "Team", href: "/team", icon: Users, permission: "team.read" },
   { label: "Approvals", href: "/approvals", icon: ShieldCheck },
@@ -72,7 +66,14 @@ const navigation = [
     icon: Settings2,
     permission: "settings.manage",
   },
+  {
+    label: "Smart inbox",
+    href: "/inbox",
+    icon: Inbox,
+    permission: "conversations.read",
+  },
 ];
+const operationPaths = new Set(["/orders", "/offers", "/inventory", "/overview"]);
 export function WorkspaceShell({
   children,
   staff,
@@ -112,11 +113,12 @@ export function WorkspaceShell({
         staff.permissions.includes("inventory.manage")),
   );
   const workspaceNavigation = visible.filter(
-    (item) => navigation.indexOf(item) < 5,
+    (item) => operationPaths.has(item.href),
   );
   const managementNavigation = visible.filter(
-    (item) => navigation.indexOf(item) >= 5,
+    (item) => !operationPaths.has(item.href) && item.href !== "/inbox",
   );
+  const unavailableNavigation = visible.filter((item) => item.href === "/inbox");
   const current = navigation.find((item) => pathname.startsWith(item.href));
   const canSearchOrders =
     !staff ||
@@ -167,7 +169,7 @@ export function WorkspaceShell({
           </span>
           <ChevronDown size={13} />
         </button>
-        <span className="nav-section">WORKSPACE</span>
+        <span className="nav-section">OPERATIONS</span>
         <nav aria-label="Primary navigation">
           {workspaceNavigation.map((item) => (
             <Link
@@ -205,12 +207,29 @@ export function WorkspaceShell({
               <span>{item.label}</span>
             </Link>
           ))}
+          {unavailableNavigation.length > 0 && (
+            <span className="nav-section nav-second">UNAVAILABLE</span>
+          )}
+          {unavailableNavigation.map((item) => (
+            <Link
+              key={item.href}
+              aria-label={item.label}
+              aria-current={pathname.startsWith(item.href) ? "page" : undefined}
+              title="Unavailable: buyer messaging is not included in the Eldorado Seller API."
+              className={
+                pathname.startsWith(item.href) ? "nav-link active" : "nav-link"
+              }
+              href={item.href}
+            >
+              <item.icon size={17} />
+              <span>{item.label}</span>
+            </Link>
+          ))}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-status">
-            <span className="status-dot amber" />
-            <span>Messaging not connected</span>
-            <ArrowUpRight size={12} />
+            <span className="status-dot" />
+            <span>Private seller operations</span>
           </div>
           <div className="profile">
             <span className="avatar">{initials}</span>
@@ -279,13 +298,20 @@ export function WorkspaceShell({
               aria-label="Operational alerts"
             >
               <strong>Operational alerts</strong>
-              <p>Official messaging access is not connected.</p>
+              <p>Buyer messaging is not included in the Eldorado Seller API.</p>
               {!configured && (
                 <p>Configure Supabase before inviting your team.</p>
               )}
-              <Link href="/settings" onClick={() => setNotifications(false)}>
-                View integration status <ArrowUpRight size={12} />
-              </Link>
+              {canManageSettings ? (
+                <Link href="/settings" onClick={() => setNotifications(false)}>
+                  View integration status <ArrowUpRight size={12} />
+                </Link>
+              ) : (
+                <p>
+                  Your Owner manages integration access. Your staff permissions
+                  remain in effect.
+                </p>
+              )}
             </div>
           )}
         </header>
@@ -340,6 +366,7 @@ export function WorkspaceShell({
                 >
                   <item.icon size={16} />
                   {item.label}
+                  {item.href === "/inbox" && " · unavailable"}
                   <ArrowUpRight size={13} />
                 </Link>
               ))}

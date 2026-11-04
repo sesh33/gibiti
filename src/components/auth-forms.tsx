@@ -55,13 +55,13 @@ export function AuthForm({
           method: "POST",
           body: JSON.stringify({ password }),
         });
-        router.push("/inbox");
+        router.replace("/");
       } else {
         await api("/api/auth/mfa", {
           method: "POST",
           body: JSON.stringify({ action: "verify", factorId: factor, code }),
         });
-        router.push("/inbox");
+        router.replace("/");
       }
       router.refresh();
     } catch (e) {

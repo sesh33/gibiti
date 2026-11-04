@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertOwnerSetupAccess,
   completeOwnerBootstrap,
+  completeVerifiedOwnerBootstrap,
+  hostedOwnerSetupEnabled,
   localOwnerSetupEnabled,
   localSupabaseAccountCreationAllowed,
   temporaryHttpsOwnerSetupEnabled,
   type OwnerBootstrapDependencies,
+  type VerifiedOwnerBootstrapDependencies,
 } from "@/domains/authentication/owner-bootstrap";
 
 const now = 1_800_000_000_000;
@@ -277,6 +280,154 @@ describe("intended Owner identity", () => {
       completeOwnerBootstrap({ ...input, accountMode: "create-local" }, deps),
     ).rejects.toThrow("email-verified");
     expect(deps.bootstrap).not.toHaveBeenCalled();
+  });
+});
+
+describe("private hosted Owner setup", () => {
+  const hostedConfiguration = {
+    ...configuration,
+    origin: "https://rivox-test.example",
+    hostedSetup: "true",
+    supabaseUrl: "https://project.supabase.co",
+  };
+
+  it("requires explicit hosted opt-in, HTTPS, a canonical project URL and bounded private credentials", () => {
+    expect(hostedOwnerSetupEnabled(hostedConfiguration, now)).toBe(true);
+    expect(temporaryHttpsOwnerSetupEnabled(hostedConfiguration, now)).toBe(
+      false,
+    );
+    for (const overrides of [
+      { hostedSetup: undefined },
+      { hostedSetup: "false" },
+      { enabled: "false" },
+      { token: "short" },
+      { expiresAt: String(now - 1) },
+      { expiresAt: String(now + 2 * 60 * 60 * 1000) },
+      { origin: "http://rivox-test.example" },
+      { origin: "https://rivox-test.example/" },
+      { origin: "https://rivox-test.example/setup/owner" },
+      { supabaseUrl: "http://127.0.0.1:54321" },
+      { supabaseUrl: "https://project.supabase.co/" },
+      { supabaseUrl: "https://project.supabase.co/auth" },
+      { supabaseUrl: "https://attacker.example" },
+      { supabaseUrl: "https://user:password@project.supabase.co" },
+    ])
+      expect(
+        hostedOwnerSetupEnabled({ ...hostedConfiguration, ...overrides }, now),
+      ).toBe(false);
+  });
+
+  it("accepts only the configured hosted Host, Origin and private capability", () => {
+    const request = (host: string, origin: string) =>
+      new Request("http://localhost:3000/api/setup/owner", {
+        method: "POST",
+        headers: { host, origin },
+      });
+    expect(() =>
+      assertOwnerSetupAccess(
+        request("rivox-test.example", "https://rivox-test.example"),
+        configuration.token,
+        hostedConfiguration,
+        now,
+      ),
+    ).not.toThrow();
+    for (const candidate of [
+      request("attacker.example", "https://rivox-test.example"),
+      request("rivox-test.example", "https://attacker.example"),
+    ])
+      expect(() =>
+        assertOwnerSetupAccess(
+          candidate,
+          configuration.token,
+          hostedConfiguration,
+          now,
+        ),
+      ).toThrow("configured origin");
+    expect(() =>
+      assertOwnerSetupAccess(
+        request("rivox-test.example", "https://rivox-test.example"),
+        "wrong private token",
+        hostedConfiguration,
+        now,
+      ),
+    ).toThrow("token was not accepted");
+  });
+
+  function verifiedDependencies() {
+    return {
+      ownerExists: vi.fn().mockResolvedValue(false),
+      verifiedIdentity: vi.fn().mockResolvedValue({
+        id: "intended-user",
+        email: input.email,
+        emailVerified: true,
+      }),
+      updatePassword: vi.fn().mockResolvedValue(undefined),
+      bootstrap: vi.fn().mockResolvedValue(undefined),
+      registerSession: vi.fn().mockResolvedValue(undefined),
+      signOut: vi.fn().mockResolvedValue(undefined),
+    } satisfies VerifiedOwnerBootstrapDependencies;
+  }
+
+  it("never claims an Owner or changes a password if membership already exists", async () => {
+    const deps = verifiedDependencies();
+    deps.ownerExists.mockResolvedValue(true);
+    await expect(completeVerifiedOwnerBootstrap(input, deps)).rejects.toThrow(
+      "already has an Owner",
+    );
+    expect(deps.verifiedIdentity).not.toHaveBeenCalled();
+    expect(deps.updatePassword).not.toHaveBeenCalled();
+    expect(deps.bootstrap).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    null,
+    { id: "unverified-user", email: input.email, emailVerified: false },
+    {
+      id: "other-user",
+      email: "someone-else@example.test",
+      emailVerified: true,
+    },
+  ])(
+    "requires the user's verified email before password or membership changes: %j",
+    async (identity) => {
+      const deps = verifiedDependencies();
+      deps.verifiedIdentity.mockResolvedValue(identity);
+      await expect(completeVerifiedOwnerBootstrap(input, deps)).rejects.toThrow(
+        "Verify the code sent to your email",
+      );
+      expect(deps.updatePassword).not.toHaveBeenCalled();
+      expect(deps.bootstrap).not.toHaveBeenCalled();
+      expect(deps.registerSession).not.toHaveBeenCalled();
+      expect(deps.signOut).toHaveBeenCalledTimes(identity ? 1 : 0);
+    },
+  );
+
+  it("updates the verified user's password then creates and registers only that identity", async () => {
+    const deps = verifiedDependencies();
+    await completeVerifiedOwnerBootstrap(input, deps);
+    expect(deps.updatePassword).toHaveBeenCalledWith(input.password);
+    expect(deps.bootstrap).toHaveBeenCalledWith({
+      id: "intended-user",
+      email: input.email,
+      name: input.name,
+    });
+    expect(deps.updatePassword.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.bootstrap.mock.invocationCallOrder[0],
+    );
+    expect(deps.bootstrap.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.registerSession.mock.invocationCallOrder[0],
+    );
+    expect(deps.signOut).not.toHaveBeenCalled();
+  });
+
+  it("clears the temporary session if the final single-Owner database guard rejects", async () => {
+    const deps = verifiedDependencies();
+    deps.bootstrap.mockRejectedValue(new Error("Owner already exists"));
+    await expect(completeVerifiedOwnerBootstrap(input, deps)).rejects.toThrow(
+      "Owner already exists",
+    );
+    expect(deps.signOut).toHaveBeenCalledOnce();
+    expect(deps.registerSession).not.toHaveBeenCalled();
   });
 });
 
