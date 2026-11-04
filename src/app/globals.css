@@ -1921,6 +1921,7 @@ input[type="checkbox"] {
 }
 .auth-panel > .back-link {
   font-size: 11px;
+  margin-right: 16px;
 }
 .skeleton-lines {
   height: 180px;
