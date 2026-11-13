@@ -44,6 +44,11 @@ type Snapshot = {
     price: number;
     currency: string;
     quantity: number;
+    context?: {
+      unitSystem: string | null;
+      minQuantity: number | null;
+      deliveryMethod: string | null;
+    };
     document: unknown | null;
   };
 };
@@ -208,6 +213,25 @@ export function OfferEditor({ configured }: { configured: boolean }) {
               <div>
                 <span>Current quantity</span>
                 <strong>{source.data.snapshot.quantity}</strong>
+              </div>
+              <div>
+                <span>Price unit reported by Eldorado</span>
+                <strong>
+                  {source.data.snapshot.context?.unitSystem ?? "Not provided"}
+                </strong>
+              </div>
+              <div>
+                <span>Minimum purchase quantity</span>
+                <strong>
+                  {source.data.snapshot.context?.minQuantity ?? "Not provided"}
+                </strong>
+              </div>
+              <div>
+                <span>Delivery method</span>
+                <strong>
+                  {source.data.snapshot.context?.deliveryMethod ??
+                    "Not provided"}
+                </strong>
               </div>
             </div>
           )}
