@@ -5,5 +5,6 @@ export default async function Page({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  return <OrderDetail id={(await params).id} configured={authConfigured()} />;
+  const { id } = await params;
+  return <OrderDetail key={id} id={id} configured={authConfigured()} />;
 }

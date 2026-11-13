@@ -76,6 +76,17 @@ it.each([
       message: null,
     }),
   ],
+  [
+    {
+      kind: "order.correct",
+      body: { message: "Synthetic corrected public delivery information" },
+    },
+    "POST",
+    `/api/v1/orders/me/${id}/delivery-details/correction`,
+    JSON.stringify({
+      message: "Synthetic corrected public delivery information",
+    }),
+  ],
 ] as const)(
   "uses the supplied write contract for %j",
   async (change, method, path, body) => {
@@ -179,4 +190,65 @@ it("does not retry an ambiguous network failure", async () => {
     client.writeMarketplace({ kind: "offer.quantity", body: 0 }, id),
   ).rejects.toMatchObject({ code: "ELDORADO_WRITE_UNKNOWN" });
   expect(writes).toBe(1);
+});
+
+it("checks scoped automation authority after authentication and before sending a commercial request", async () => {
+  const events: string[] = [];
+  const client = new EldoradoClient(
+    { clientId: "fixture", clientSecret: "fixture" },
+    async (url) => {
+      if (String(url).endsWith("/token")) {
+        events.push("authenticate");
+        return Response.json({ accessToken: "fixture", expiresIn: 900 });
+      }
+      events.push("commercial-write");
+      return Response.json({});
+    },
+  );
+  await expect(
+    client.writeMarketplace({ kind: "order.deliver" }, id, async () => {
+      events.push("authority-check");
+      throw new Error("authority revoked");
+    }),
+  ).rejects.toThrow("authority revoked");
+  expect(events).toEqual(["authenticate", "authority-check"]);
+});
+
+it("persists the entire provider cooldown across server instances without truncating Retry-After", async () => {
+  const now = Date.parse("2026-11-13T12:00:00Z");
+  let notBefore = 0;
+  const store = {
+    check: async () => {
+      if (notBefore > now) throw new Error("shared cooldown");
+    },
+    defer: vi.fn(async (until: number) => {
+      notBefore = Math.max(notBefore, until);
+    }),
+  };
+  const fetcher = vi.fn(async (url: URL | RequestInfo) =>
+    String(url).endsWith("/token")
+      ? Response.json({ accessToken: "fixture", expiresIn: 900 })
+      : new Response(null, { status: 429, headers: { "Retry-After": "7200" } }),
+  );
+  const first = new EldoradoClient(
+    { clientId: "fixture", clientSecret: "fixture" },
+    fetcher,
+    () => now,
+    store,
+  );
+  await expect(
+    first.writeMarketplace({ kind: "order.deliver" }, id),
+  ).rejects.toMatchObject({ code: "ELDORADO_WRITE_REJECTED" });
+  expect(store.defer).toHaveBeenCalledWith(now + 7200000);
+  fetcher.mockClear();
+  const second = new EldoradoClient(
+    { clientId: "fixture", clientSecret: "fixture" },
+    fetcher,
+    () => now,
+    store,
+  );
+  await expect(
+    second.writeMarketplace({ kind: "order.deliver" }, id),
+  ).rejects.toMatchObject({ code: "ELDORADO_WRITE_NOT_SENT" });
+  expect(fetcher).not.toHaveBeenCalled();
 });

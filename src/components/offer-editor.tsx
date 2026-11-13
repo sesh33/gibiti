@@ -9,6 +9,7 @@ import { money } from "@/lib/utils";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { PredefinedFields } from "@/components/predefined-fields";
+import { PricingControls } from "@/components/pricing-controls";
 import {
   changeLabels,
   requiredChangePermissions,
@@ -429,6 +430,9 @@ export function OfferEditor({ configured }: { configured: boolean }) {
           </section>
         )}
       </div>
+      {!create && target && (
+        <PricingControls offerId={target} configured={configured} />
+      )}
     </>
   );
 }

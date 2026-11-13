@@ -22,6 +22,12 @@ export async function POST(
       .strict()
       .parse(await readBody(request));
     const ticket = await loadMarketTicket((await params).id, staff);
+    if (input.mode === "execute" && ticket.payload.automaticPolicyId)
+      throw new AppError(
+        "AUTOMATIC_SERVICE_TICKET",
+        "This scoped automatic ticket belongs to the hosted runner. Use Check outcome, or request a separate manual change.",
+        409,
+      );
     if (
       !requiredChangePermissions(ticket.payload.change.kind).every(
         (permission) => staff.permissions.has(permission),

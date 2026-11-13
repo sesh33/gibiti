@@ -172,6 +172,12 @@ export const marketplaceChange = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("order.deliver") }).strict(),
   z
     .object({
+      kind: z.literal("order.correct"),
+      body: z.object({ message: z.string().max(2000).nullable() }).strict(),
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal("order.cancel"),
       body: z
         .object({
@@ -203,6 +209,7 @@ export const changePermissions = {
   "order.deliver": "orders.deliver",
   "order.cancel": "orders.cancel",
   "order.extend": "orders.update_delivery",
+  "order.correct": "orders.update_delivery",
 } as const;
 export function requiredChangePermissions(kind: MarketplaceChange["kind"]) {
   return kind === "offer.details"
@@ -217,6 +224,8 @@ export const operationInput = z
     idempotencyKey: z.uuid(),
     confirm: z.literal(true),
     change: marketplaceChange,
+    automaticDelivery: z.boolean().optional(),
+    fulfillmentConfirmed: z.boolean().optional(),
   })
   .strict();
 export const changeLabels: Record<MarketplaceChange["kind"], string> = {
@@ -227,4 +236,5 @@ export const changeLabels: Record<MarketplaceChange["kind"], string> = {
   "order.deliver": "Mark delivered",
   "order.cancel": "Cancel order",
   "order.extend": "Extend delivery time",
+  "order.correct": "Correct delivery note",
 };

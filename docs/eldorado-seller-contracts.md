@@ -18,14 +18,15 @@ Order actions are restricted to currently Paid orders. No delivery automation is
 
 Price, quantity, delivery and cancellation are checked against fresh actual values/state. Details verify observable product/pricing/delivery fields; environment/attribute acceptance is acknowledged from the successful response without claiming a complete round trip for their unspecified schemas. Creation records HTTP 201 acceptance and refreshes the catalog. An extension's HTTP 204 acceptance is recorded separately from independent deadline verification. Lost/ambiguous writes remain locked and are never automatically replayed.
 
-Public comparison is informational: same game/category, currency, unit, minimum purchase, environment, attributes and delivery method; Active with stock only. Incomplete metadata is blocked, page scope is disclosed, and no automatic price recommendation or repricing is offered. No automatic process can lower a price below a configured floor because no automatic price writes exist.
+The single-page public comparison is informational. Repricing uses a separate complete-market calculation, exact equivalence and persisted floors, defaulting to simulation. Partial/ambiguous metadata, duplicate rows and pagination beyond the five-page application budget block recommendations and writes. Manual quoted changes require confirmation and independent review. Automatic repricing requires an explicitly saved rule, independent MFA review and the Owner workspace switch. A database trigger enforces the same floor/currency on both individual price and full-details changes. The market and own listing are reread before execution; uncertain requests are never repeated.
 
 ## Supplied endpoint and schema text
 
-1) MINHAS OFERTAS
+1. MINHAS OFERTAS
 
 GET /api/predefinedOffers/me
 Autenticado. Query opcional:
+
 - offerState
 - gameId
 - category
@@ -42,6 +43,7 @@ Autenticado. Query opcional:
 {"attribute-id":["value1","value2"]}
 
 Resposta paginada:
+
 - pageSize
 - results
 - pageIndex
@@ -53,10 +55,11 @@ Os itens retornados são ofertas privadas próprias; seus campos ficam diretamen
 GET /api/predefinedOffers/{id}/private
 Autenticado; id é UUID. Busca a visão privada da oferta. Respostas documentadas: 200 ou 404.
 
-2) OFERTAS PÚBLICAS PARA COMPARAÇÃO DE PREÇO
+2. OFERTAS PÚBLICAS PARA COMPARAÇÃO DE PREÇO
 
 GET /api/predefinedOffers/game
 Query:
+
 - gameId
 - category
 - tradeEnvironmentId
@@ -68,13 +71,14 @@ Query:
 
 Resposta é paginada. Cada `results[]` é um grupo com estrutura:
 {
-  "offer": { ...dados da oferta pública... },
-  "user": { ...dados públicos do vendedor... },
-  "userOrderInfo": { ...avaliações/resumo público... },
-  "deliveryTime": { ...mediana e previsão... }
+"offer": { ...dados da oferta pública... },
+"user": { ...dados públicos do vendedor... },
+"userOrderInfo": { ...avaliações/resumo público... },
+"deliveryTime": { ...mediana e previsão... }
 }
 
 Os campos relevantes estão em `result.offer`, incluindo:
+
 - id, userId, gameId, category, gameCategoryTitle
 - quantity, minQuantity
 - pricePerUnit, pricePerUnitWithDiscount, pricePerUnitInUSD
@@ -86,17 +90,19 @@ Os campos relevantes estão em `result.offer`, incluindo:
 Comparação: use ofertas ativas e com estoque, do mesmo jogo/categoria, plataforma/ambiente, seleção de pacote/atributos, método de entrega e unidade. Compare o preço na mesma moeda; use `pricePerUnitInUSD` ou a taxa retornada pela API quando apropriado. Não trate ofertas de quantidades/pacotes diferentes como concorrentes equivalentes. Se não conseguir identificar atributos ou pacote com segurança, não recomende nem aplique mudança.
 
 Enums úteis:
+
 - category: Account, CustomItem, Currency, Boosting, RequestedBoosting, ManagedBoosting, TopUp, GiftCard
 - deliveryMethod: Unspecified, EpicGifting, IslandDelivery, GamePass, MailTrade, AuctionHouse, InGameTrade, RedeemCode, AutoClaim, LoginMethod, Donation
 - offerState: Active, Paused, Closed, Offline
 - unitSystem: Unit1, Unit1000, Unit1000000, Unit1000000000, Unit1000000000000, Unit1Quadrillion, Unit1Quintillion, Unit1Sextillion, Unit1Septillion, Unit1Octillion, Unit1Nonillion, Unit1Decillion
 
-3) MUDAR PREÇO, QUANTIDADE E DISPONIBILIDADE
+3. MUDAR PREÇO, QUANTIDADE E DISPONIBILIDADE
 
 PUT /api/predefinedOffersUser/me/{id}/changePrice
 Autenticado; `id` UUID.
 Corpo MoneyBaseDTO:
 {"amount":1.09,"currency":"USD"}
+
 - amount: number/double
 - currency: enum string
 - resposta 200: MoneyBaseDTO
@@ -112,6 +118,7 @@ PUT /api/predefinedOffersUser/me/{id}/resume
 Autenticado; `id` UUID; sem corpo; resposta 200.
 
 A API também tem operações em lote. Não as acione automaticamente:
+
 - PUT /api/predefinedOffersUser/me/pauseAllActive
 - PUT /api/predefinedOffersUser/me/resumeLatestPaused/{gameId}
 - PUT /api/predefinedOffersUser/me/changeDeliveryTimeForAll
@@ -122,16 +129,17 @@ A API também tem operações em lote. Não as acione automaticamente:
 As duas aceitam filtros opcionais de oferta, incluindo gameId/category/ambiente/atributos, e retornam contagem de ofertas afetadas.
 
 Há ainda rotas de exclusão:
+
 - DELETE /api/predefinedOffersUser/me/{id}
 - DELETE /api/predefinedOffersUser/me/deleteAll
-Não chamar nem oferecer ação em lote de exclusão sem uma confirmação explícita e específica do usuário.
+  Não chamar nem oferecer ação em lote de exclusão sem uma confirmação explícita e específica do usuário.
 
 Enum de moeda:
 USD, EUR, GBP, AUD, CAD, JPY, BRL, SGD, CHF, SEK, DKK, NOK, NZD, THB,
 HKD, CZK, SAR, PLN, AED, MXN, RON, ILS, ARS, TRY, QAR, HUF, PEN, KWD,
 BGN, CLP, COP, IDR, PHP.
 
-4) CRIAR E EDITAR DETALHES DE OFERTA (SE FIZER PARTE DO APP)
+4. CRIAR E EDITAR DETALHES DE OFERTA (SE FIZER PARTE DO APP)
 
 POST /api/predefinedOffers
 Cria oferta; resposta 201.
@@ -141,30 +149,31 @@ Edita detalhes; id UUID; resposta 200.
 
 Ambas recebem `PredefinedOfferPrivateDTO`:
 {
-  "details": {
-    "description": "Descrição",
-    "guaranteedDeliveryTime": "Minute20",
-    "pricing": {
-      "quantity": 1,
-      "minQuantity": 1,
-      "volumeDiscounts": [],
-      "pricePerUnit": {
-        "amount": 1.09,
-        "currency": "USD"
-      }
-    },
-    "deliveryMethod": "InGameTrade"
-  },
-  "augmentedGame": {
-    "gameId": "ID_DO_JOGO",
-    "category": "CustomItem",
-    "tradeEnvironmentId": null,
-    "offerAttributes": []
-  },
-  "giftCardDetails": []
+"details": {
+"description": "Descrição",
+"guaranteedDeliveryTime": "Minute20",
+"pricing": {
+"quantity": 1,
+"minQuantity": 1,
+"volumeDiscounts": [],
+"pricePerUnit": {
+"amount": 1.09,
+"currency": "USD"
+}
+},
+"deliveryMethod": "InGameTrade"
+},
+"augmentedGame": {
+"gameId": "ID_DO_JOGO",
+"category": "CustomItem",
+"tradeEnvironmentId": null,
+"offerAttributes": []
+},
+"giftCardDetails": []
 }
 
 Regras do schema:
+
 - DTO principal exige `details`, `augmentedGame`, `giftCardDetails`.
 - `augmentedGame` exige `gameId` e `category`.
 - `pricing` exige `quantity`, `minQuantity`, `pricePerUnit`.
@@ -179,10 +188,11 @@ Minute20, Hour1, Hour5, Hour12, Day1, Day2, Day3, Day7, Day14, Day28,
 Instant, Minute5, Day45, Day60, NotApplicable, Hour2, Hour3, Hour8,
 Automated, Day5, Day10, Day80, Day100.
 
-5) PEDIDOS — LISTAGEM E PAGINAÇÃO
+5. PEDIDOS — LISTAGEM E PAGINAÇÃO
 
 GET /api/v1/orders/me/seller/orders
 Autenticado. Query:
+
 - `displayFilter`: obrigatório; para pedidos do vendedor usar `DisplaySellingOrders`
 - `query`
 - `orderState`
@@ -198,12 +208,14 @@ Autenticado. Query:
 - `orderGroup`
 
 Enums:
+
 - displayFilter: DisplayBuyingOrders, DisplaySellingOrders
 - orderState: Paid, Disputed, Delivered, Received, Completed, Canceled, PendingReview
 - pageDirection: Next, Previous
 - orderGroup: Regular, Historical
 
 Resposta cursor-paginada:
+
 - results
 - pageSize
 - cursor
@@ -216,7 +228,7 @@ Campos importantes no item de pedido incluem id, offerId, purchaseQuantity, tota
 stateLogs, orderOfferDetails, createdDate, deliveryStartedDate, deliveryTime, buyerUsername,
 isHistorical e flags de disputa/garantia. Trate subobjetos opcionais como null.
 
-6) AÇÕES DE PEDIDO
+6. AÇÕES DE PEDIDO
 
 PUT /api/v1/orders/me/{orderId}/deliver
 Autenticado; orderId UUID; sem corpo; resposta 200 com OrderGetSellerPrivateDTO.
@@ -259,7 +271,7 @@ Corpo:
 {"message":"Texto da correção"}
 Schema marca `message` obrigatório, embora nullable; resposta 200.
 
-7) DIAGNÓSTICO E DADOS AUXILIARES
+7. DIAGNÓSTICO E DADOS AUXILIARES
 
 GET /api/v1/orders/me/seller-api-eligibility
 Retorna elegibilidade da Seller API.
@@ -276,7 +288,8 @@ A documentação informa que não há registro de webhooks no momento. Para novo
 usar polling com intervalo configurável, backoff e respeito às respostas 429/headers de
 rate limit. Não assumir cota numérica sem dado oficial.
 
-8) INTERFACE E PROTEÇÕES NECESSÁRIAS
+8. INTERFACE E PROTEÇÕES NECESSÁRIAS
+
 - Mostrar estado de conexão e erro sem expor credenciais/tokens.
 - Mostrar loading, vazio, falha de rede, 401/403, 404, 429 e sucesso.
 - Após mudança bem-sucedida, reler a oferta/pedido da API e atualizar a interface com o

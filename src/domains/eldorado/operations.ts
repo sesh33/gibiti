@@ -12,6 +12,7 @@ import { requireStaff } from "@/domains/authentication/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { AppError } from "@/lib/errors";
 import { synchronizeOfferPage } from "@/domains/offers/service";
+import { validateQuoteBeforeWrite } from "@/domains/pricing/quotes";
 type Staff = Awaited<ReturnType<typeof requireStaff>>;
 export type MarketTicket = {
   id: string;
@@ -21,8 +22,12 @@ export type MarketTicket = {
   target_id: string;
   status: string;
   external_attempted: boolean;
+  repricing_quote_id?: string | null;
+  automatic_delivery_requested?: boolean;
   payload: {
     marketV1: true;
+    automaticPolicyId?: string;
+    automaticPolicyVersion?: string;
     change: MarketplaceChange;
     nativeId: string | null;
     before: Record<string, unknown>;
@@ -63,12 +68,22 @@ function eligible(
   change: MarketplaceChange,
   snapshot: Record<string, unknown>,
 ) {
+  if (change.kind === "order.correct") return snapshot.state === "Delivered";
   return change.kind.startsWith("offer.")
     ? ["Active", "Paused"].includes(String(snapshot.state))
     : ["Paid"].includes(String(snapshot.state));
 }
 export async function requestMarketOperation(raw: unknown, staff: Staff) {
   const input = operationInput.parse(raw);
+  if (
+    input.automaticDelivery &&
+    (input.change.kind !== "order.deliver" || !input.fulfillmentConfirmed)
+  )
+    throw new AppError(
+      "FULFILLMENT_CONFIRMATION_REQUIRED",
+      "Automatic marking requires an explicit confirmation that the actual transfer is complete.",
+      400,
+    );
   if (
     !requiredChangePermissions(input.change.kind).every((permission) =>
       staff.permissions.has(permission),
@@ -81,7 +96,7 @@ export async function requestMarketOperation(raw: unknown, staff: Staff) {
     );
   const { data: prior, error: priorError } = await staff.db
     .from("approval_requests")
-    .select("id,payload,target_id,reason")
+    .select("id,payload,target_id,reason,automatic_delivery_requested")
     .eq("idempotency_key", input.idempotencyKey)
     .eq("requester_id", staff.user.id)
     .maybeSingle();
@@ -95,6 +110,8 @@ export async function requestMarketOperation(raw: unknown, staff: Staff) {
     if (
       prior.target_id !== input.target ||
       prior.reason !== input.reason ||
+      Boolean(prior.automatic_delivery_requested) !==
+        Boolean(input.automaticDelivery) ||
       !isDeepStrictEqual(prior.payload?.change, input.change) ||
       (prior.payload?.expectedSnapshot
         ? Date.parse(prior.payload.expectedSnapshot)
@@ -149,14 +166,27 @@ export async function requestMarketOperation(raw: unknown, staff: Staff) {
         400,
       );
   }
-  const { data, error } = await staff.db.rpc("request_marketplace_operation", {
+  const rpcName =
+    input.change.kind === "order.correct"
+      ? "request_delivery_correction"
+      : input.automaticDelivery
+        ? "request_marketplace_with_delivery_optin"
+        : "request_marketplace_operation";
+  const { data, error } = await staff.db.rpc(rpcName, {
     change: input.change,
     target: input.target,
     expected_snapshot: input.expectedSnapshot,
     remote_before: before,
     justification: input.reason,
     request_key: input.idempotencyKey,
+    ...(input.automaticDelivery ? { transfer_confirmed: true } : {}),
   });
+  if (error && input.automaticDelivery && error.code === "42501")
+    throw new AppError(
+      "AUTO_DELIVERY_AUTH_REQUIRED",
+      "Automatic delivery marking requires MFA, workspace authorization and a confirmed completed transfer.",
+      403,
+    );
   if (error)
     throw new AppError(
       "OPERATION_CONFLICT",
@@ -209,10 +239,12 @@ export function matchesChange(
     case "order.cancel":
       return ["Canceled", "Cancelled"].includes(String(observed.state));
     case "order.extend":
+    case "order.correct":
       return acknowledged;
   }
 }
 export type OperationDependencies = {
+  validateQuote?(): Promise<void>;
   refreshCreated?(): Promise<unknown>;
   current(
     change: MarketplaceChange,
@@ -312,6 +344,28 @@ export async function executeMarketTicket(
       "A different authorized reviewer must approve this exact request first.",
       409,
     );
+  if (dependencies.validateQuote) {
+    try {
+      await dependencies.validateQuote();
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        ["ELDORADO_RATE_LIMITED", "ELDORADO_UNREACHABLE"].includes(error.code)
+      )
+        throw error;
+      return {
+        operation: await dependencies.finish(
+          "failed",
+          null,
+          error instanceof AppError ? error.code : "QUOTE_CHECK_FAILED",
+        ),
+        message:
+          error instanceof AppError
+            ? error.message
+            : "The market could not be confirmed. No change was sent.",
+      };
+    }
+  }
   if (change.kind !== "offer.create") {
     const fresh = await dependencies.current(change, ticket.payload.nativeId!);
     if (
@@ -429,12 +483,17 @@ export async function executeMarketTicket(
               verification:
                 "details-and-product-observed; game-attributes-acknowledged",
             }
-          : change.kind === "order.extend"
+          : change.kind === "order.correct"
             ? {
                 verification:
-                  "HTTP-204-accepted; deadline-not-independently-verified",
+                  "HTTP-200-accepted; correction-text-not-independently-readable",
               }
-            : { verification: "observed" }),
+            : change.kind === "order.extend"
+              ? {
+                  verification:
+                    "HTTP-204-accepted; deadline-not-independently-verified",
+                }
+              : { verification: "observed" }),
       },
       null,
     ),
@@ -451,6 +510,12 @@ export function operationDependencies(
   const client = eldoradoClient(),
     admin = supabaseAdmin();
   return {
+    ...(ticket.repricing_quote_id
+      ? {
+          validateQuote: () =>
+            validateQuoteBeforeWrite(ticket.repricing_quote_id!),
+        }
+      : {}),
     refreshCreated: () =>
       synchronizeOfferPage(staff.user.id, staff.sessionId, "predefined"),
     current: (change, id) => current(change, id, client),
@@ -485,3 +550,4 @@ export function operationDependencies(
     },
   };
 }
+export { current as readMarketCurrent };

@@ -8,7 +8,10 @@ flowchart LR
   Permission --> SQL[PostgreSQL RLS + transactional RPCs]
   SQL --> Audit[Append-only operational audit]
   API --> Seller[Server-only Eldorado client]
-  Seller --> Read[Official seller read API]
+  Seller --> Read[Official Seller read/write contracts]
+  Cron[Supabase pg_cron + private Vault dispatcher] --> Worker[Authenticated Vercel worker]
+  Worker --> SQL
+  Worker --> Seller
   API --> Messaging[MessagingProvider]
   Messaging --> Blocked[Unavailable in production]
   Messaging --> Mock[Opt-in development fixtures]
@@ -20,11 +23,11 @@ flowchart LR
 - **Authorization:** six staff roles, explicit override grants/denies, per-assignment order access, database policy enforcement. Privileged roles require AAL2 in both the app and SQL.
 - **Eldorado:** token acquisition/reuse/renewal, validated reads, controlled timeouts, no automatic mutation retry.
 - **Orders:** sanitized normalization, atomic page/history synchronization, assignment/context queries and internal notes.
-- **Offers:** documented read endpoint inventory and separate local storage. Read contracts were validated for flexible/predefined/item listing categories. These have real read-only adapters; currency request and commercial-write contracts remain unverified.
+- **Offers:** documented read endpoint inventory and separate local storage. Read contracts were validated for flexible/predefined/item listing categories. All four adapters have verified read transports. Predefined price/quantity/details/creation and individual availability use supplied official write contracts with confirmation, review and reconciliation.
 - **Inventory:** metadata, separate ciphertext storage, transactional reservation with row locks and a partial unique index.
 - **Messaging:** abstract provider, unavailable provider, opt-in synthetic provider. No live messaging provider or credentials have been fabricated. Local template assistance is separate from external AI and cannot send messages.
 - **Team:** Owner-confirmed Auth invitations, active membership, approved access changes, immediate staff-session revocation.
-- **Approvals:** intent records, unique idempotency keys, row-locked decisions, distinct reviewers, internal permission-change execution; external write adapter intentionally unavailable.
+- **Approvals:** intent records, unique idempotency keys, row-locked decisions, distinct reviewers, internal permission-change execution; reviewed commercial execution with fresh pre/post reads, shared listing locks and durable delivery tombstones.
 - **Audit:** internally generated events in the same transaction as supported database mutations. Authenticated users have no insert/update/delete grant.
 - **Analytics:** count/status metrics and completed volume grouped by currency, explicitly limited to up to 1,000 visible synchronized records.
 
@@ -44,4 +47,4 @@ This is a single-organization private workspace, not a tenant-isolated multitena
 
 The local SQL harness provides synthetic Supabase-compatible auth helpers. Real Supabase gateway/JWT, SMTP, refresh propagation, recovery, and hosting behavior require independent staging tests. The real local Supabase stack was additionally exercised with passwords, MFA, invitation delivery, signed JWTs, RLS, permissions and actual official seller reads. No claim of hosted readiness follows from local SQL/Auth success.
 
-External write execution needs verified official state transitions, payload schemas, fresh upstream reads before/after each operation, durable operation IDs, lock/lease ownership, ambiguous-result recovery, and explicit authorization. None of those are replaced by an approval record. The adapter remains disabled.
+External write execution needs verified official state transitions, payload schemas, fresh upstream reads before/after each operation, durable operation IDs, lock/lease ownership, ambiguous-result recovery, and explicit authorization. None of those are replaced by an approval record. The implemented adapter uses these guards. The hosted worker has its own private shared key; staff cookies cannot invoke it. Owner-authorized machine sessions, policy versions and current staff permissions are rechecked before writes. No automated mode starts enabled. Runtime configuration, policies, quotes, cursor checkpoints, leases, cooldowns and audit are durable database records; local operator helper files are not production dependencies.

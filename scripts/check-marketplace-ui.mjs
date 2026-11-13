@@ -38,7 +38,10 @@ const id = "11111111-1111-4111-8111-111111111111",
 async function fixture(viewer = false) {
   const page = await browser.newPage();
   let price = 1,
-    operation;
+    operation,
+    policy,
+    lastPolicy,
+    lastAuthorization;
   const counts = { requests: 0, executions: 0, checks: 0 };
   let lastRequest;
   const errors = [];
@@ -62,7 +65,7 @@ async function fixture(viewer = false) {
       });
     if (path === "/api/me")
       return json({
-        profile: { role: viewer ? "VIEWER" : "OWNER" },
+        profile: { id: "fixture-requester", role: viewer ? "VIEWER" : "OWNER" },
         permissions: viewer
           ? ["offers.read"]
           : [
@@ -73,6 +76,72 @@ async function fixture(viewer = false) {
             ],
       });
     if (path === "/api/team") return json({ items: [] });
+    if (path === "/api/pricing/policies") {
+      if (r.method() === "POST") {
+        lastPolicy = r.postDataJSON();
+        policy = {
+          ...lastPolicy,
+          id: requestId,
+          native_id: id,
+          offer_id: "predefined:" + id,
+          currency: "USD",
+          version: id,
+          created_by: "fixture-requester",
+          approved_by: null,
+          interval_seconds: lastPolicy.intervalSeconds,
+          review_status:
+            lastPolicy.mode === "automatic" ? "pending" : "not_required",
+          next_run_at: stamp,
+        };
+        return json({ policy });
+      }
+      return json({ items: policy ? [policy] : [] });
+    }
+    if (path === "/api/pricing/history") return json({ items: [] });
+    if (path === "/api/pricing/quotes")
+      return json({
+        quote: {
+          id: requestId,
+          policy_id: requestId,
+          policy_version: id,
+          requested_by: "fixture-requester",
+          amount: 1.95,
+          currency: "USD",
+          proof: { complete: true, equivalentOffers: 1, pages: 1 },
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 120000).toISOString(),
+        },
+        noChange: false,
+      });
+    if (path === `/api/pricing/quotes/${requestId}/request`) {
+      lastRequest = r.postDataJSON();
+      counts.requests++;
+      return json({ id: requestId }, 201);
+    }
+    if (path === "/api/automation/settings") {
+      if (r.method() === "POST") lastAuthorization = r.postDataJSON();
+      return json({
+        settings: {
+          pollEnabled: false,
+          pollSeconds: 60,
+          autoDeliveryEnabled: false,
+          autoPricingEnabled: false,
+        },
+        runtime: {
+          scheduler_configured: true,
+          last_heartbeat_at: null,
+          last_poll_at: null,
+          last_error_code: null,
+          backoff_until: null,
+        },
+        connection: {
+          configured: true,
+          verifiedOnThisServer: true,
+          verifiedAt: stamp,
+          verifiedOrigin: "https://rivox.example",
+        },
+      });
+    }
     if (path === `/api/marketplace/offers/${id}`)
       return json({
         local: {
@@ -170,6 +239,12 @@ async function fixture(viewer = false) {
     errors,
     get request() {
       return lastRequest;
+    },
+    get policy() {
+      return lastPolicy;
+    },
+    get authorization() {
+      return lastAuthorization;
     },
   };
 }
@@ -339,6 +414,128 @@ try {
   assert.deepEqual(extension.errors, []);
   await extension.page.close();
   checks.push("deadline extension uses documented time and reason enums");
+  const pricing = await fixture();
+  await pricing.page.goto(
+    `http://127.0.0.1:3197/offers/edit?id=predefined:${id}`,
+  );
+  await pricing.page
+    .getByLabel("Minimum unit price", { exact: true })
+    .fill("1.5");
+  await pricing.page
+    .getByLabel("Price difference below an equivalent competitor")
+    .fill("0.05");
+  await pricing.page
+    .getByRole("button", { name: "Save pricing rule", exact: true })
+    .click();
+  await expect(
+    pricing.page.getByText("simulation · not_required", { exact: true }),
+  ).toBeVisible();
+  assert.equal(pricing.policy.mode, "simulation");
+  await pricing.page
+    .getByRole("button", { name: "Simulate against the complete market" })
+    .click();
+  await expect(pricing.page.getByText("$1.95", { exact: true })).toBeVisible();
+  assert.equal(pricing.counts.requests, 0);
+  assert.equal(pricing.counts.executions, 0);
+  checks.push(
+    "persisted floor defaults to simulation and simulation sends no change",
+  );
+  await pricing.page
+    .getByLabel("Pricing mode", { exact: true })
+    .selectOption("manual");
+  await pricing.page
+    .getByRole("button", { name: "Save pricing rule", exact: true })
+    .click();
+  await expect(
+    pricing.page.getByText("manual · not_required", { exact: true }),
+  ).toBeVisible();
+  await pricing.page
+    .getByRole("button", { name: "Simulate against the complete market" })
+    .click();
+  await pricing.page
+    .getByLabel("Reason for this quoted price")
+    .fill("Reviewed exact comparable package and floor");
+  await expect(
+    pricing.page.getByRole("button", {
+      name: "Request this quoted price",
+    }),
+  ).toBeDisabled();
+  await pricing.page
+    .getByLabel("I confirm this listing and the displayed simulated price.")
+    .check();
+  await pricing.page
+    .getByRole("button", { name: "Request this quoted price" })
+    .click();
+  await expect.poll(() => pricing.counts.requests).toBe(1);
+  assert.equal(pricing.request.confirm, true);
+  assert.equal("amount" in pricing.request, false);
+  assert.equal(pricing.counts.executions, 0);
+  checks.push(
+    "manual repricing requires confirmation and submits only a server-owned quote reference",
+  );
+  await pricing.page
+    .getByLabel("Pricing mode", { exact: true })
+    .selectOption("automatic");
+  await expect(
+    pricing.page.getByRole("button", {
+      name: "Save pricing rule",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await pricing.page
+    .getByLabel(
+      "I explicitly request automatic repricing for this listing using this exact floor, difference and precision.",
+    )
+    .check();
+  await pricing.page
+    .getByRole("button", { name: "Save pricing rule", exact: true })
+    .click();
+  await expect(
+    pricing.page.getByText("automatic · pending", { exact: true }),
+  ).toBeVisible();
+  assert.equal(pricing.policy.confirmAutomatic, true);
+  assert.equal(pricing.counts.executions, 0);
+  checks.push(
+    "automatic policy requires explicit consent and awaits independent review",
+  );
+  assert.deepEqual(pricing.errors, []);
+  await pricing.page.close();
+  const automation = await fixture();
+  await automation.page.goto("http://127.0.0.1:3197/automation");
+  await automation.page
+    .getByLabel("Allow independently approved automatic pricing rules")
+    .check();
+  await expect(
+    automation.page.getByRole("button", {
+      name: "Save workspace authorization",
+    }),
+  ).toBeDisabled();
+  await automation.page
+    .getByLabel(/I explicitly authorize the selected automatic modes/)
+    .check();
+  await automation.page
+    .getByRole("button", { name: "Save workspace authorization" })
+    .click();
+  await expect
+    .poll(() => automation.authorization?.autoPricingEnabled)
+    .toBe(true);
+  await expect(
+    automation.page.getByText(/Workspace preferences saved/),
+  ).toBeVisible();
+  await automation.page
+    .getByRole("button", { name: "Save workspace authorization" })
+    .click();
+  await expect
+    .poll(() => automation.authorization?.autoPricingEnabled)
+    .toBe(false);
+  assert.equal(automation.authorization.autoDeliveryEnabled, false);
+  assert.equal(automation.authorization.confirmAutomation, false);
+  assert.equal(automation.counts.executions, 0);
+  assert.deepEqual(automation.errors, []);
+  await automation.page.close();
+  checks.push(
+    "workspace opt-in requires explicit consent and its stop switches remain saveable without consent",
+  );
   console.log(JSON.stringify({ passed: true, checks, externalWrites: 0 }));
 } finally {
   await browser.close();

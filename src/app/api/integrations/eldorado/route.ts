@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/domains/authentication/session";
-import { EldoradoClient, resetEldoradoClient } from "@/domains/eldorado/client";
+import {
+  EldoradoClient,
+  eldoradoClient,
+  resetEldoradoClient,
+} from "@/domains/eldorado/client";
 import {
   encryptSellerSecret,
   sellerClientId,
   sellerConnectionStatus,
 } from "@/domains/eldorado/credentials";
+import { eldoradoRateStore } from "@/domains/eldorado/rate-store";
+import { serverFetch } from "@/lib/server-fetch";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireSameOrigin, readBody } from "@/lib/http";
 import { AppError, errorResponse } from "@/lib/errors";
@@ -35,9 +41,13 @@ export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
     const staff = await owner();
-    const { clientSecret } = z
-      .object({ clientSecret: z.string().min(10).max(512).regex(/^\S+$/) })
-      .strict()
+    const input = z
+      .union([
+        z.object({ action: z.literal("verify") }).strict(),
+        z
+          .object({ clientSecret: z.string().min(10).max(512).regex(/^\S+$/) })
+          .strict(),
+      ])
       .parse(await readBody(request));
     const { data: allowed, error: rateError } = await staff.db.rpc(
       "consume_rate_limit",
@@ -49,11 +59,39 @@ export async function POST(request: Request) {
         "Wait a minute before checking the connection again.",
         429,
       );
+    if ("action" in input) {
+      const page = await eldoradoClient().orders();
+      const { error } = await supabaseAdmin().rpc("verify_seller_connection", {
+        actor: staff.user.id,
+        actor_session: staff.sessionId,
+        verification_origin: process.env.APP_ORIGIN,
+      });
+      if (error)
+        throw new AppError(
+          "VERIFICATION_RECORD_FAILED",
+          "The read succeeded but its origin could not be recorded.",
+          503,
+        );
+      return NextResponse.json(
+        {
+          ok: true,
+          message: `Seller authentication and ${page.results.length} orders verified by this server.`,
+          verifiedOrigin: process.env.APP_ORIGIN,
+        },
+        { headers },
+      );
+    }
+    const { clientSecret } = input;
     const clientId = sellerClientId();
     // Validate encryption before contacting upstream. Only the official read
     // contract is tested; connection setup never changes listings or orders.
     const encrypted = encryptSellerSecret(clientSecret, clientId);
-    const client = new EldoradoClient({ clientId, clientSecret });
+    const client = new EldoradoClient(
+      { clientId, clientSecret },
+      serverFetch,
+      Date.now,
+      eldoradoRateStore(),
+    );
     await client.orders();
     const admin = supabaseAdmin();
     const { error } = await admin.rpc("save_seller_credentials", {
@@ -61,6 +99,7 @@ export async function POST(request: Request) {
       credential_envelope: encrypted,
       actor: staff.user.id,
       actor_session: staff.sessionId,
+      verification_origin: process.env.APP_ORIGIN,
     });
     if (error)
       throw new AppError(

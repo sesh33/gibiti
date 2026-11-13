@@ -34,6 +34,7 @@ export function EldoradoConnection({ configured }: { configured: boolean }) {
         configured: boolean;
         clientId: string | null;
         verifiedAt: string | null;
+        verifiedOrigin?: string | null;
       }>("/api/integrations/eldorado"),
     enabled: isOwner,
     retry: false,
@@ -66,6 +67,28 @@ export function EldoradoConnection({ configured }: { configured: boolean }) {
         error instanceof Error
           ? error.message
           : "Connection could not be saved.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function verifyFromThisServer() {
+    setBusy(true);
+    setFailed(false);
+    setMessage("");
+    try {
+      const result = await api<{ message: string }>(
+        "/api/integrations/eldorado",
+        { method: "POST", body: JSON.stringify({ action: "verify" }) },
+      );
+      setMessage(result.message);
+      await connection.refetch();
+    } catch (error) {
+      setFailed(true);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The connection could not be verified.",
       );
     } finally {
       setBusy(false);
@@ -126,6 +149,20 @@ export function EldoradoConnection({ configured }: { configured: boolean }) {
               Last successful connection check:{" "}
               {new Date(connection.data.verifiedAt).toLocaleString()}
             </p>
+          )}
+          {connection.data.verifiedOrigin && (
+            <p className="scope-note">
+              Verified by server: {connection.data.verifiedOrigin}
+            </p>
+          )}
+          {connection.data.configured && (
+            <Button
+              variant="outline"
+              onClick={verifyFromThisServer}
+              disabled={busy}
+            >
+              Verify saved connection from this server
+            </Button>
           )}
           <form
             className="connection-form"

@@ -10,6 +10,8 @@ export default async function Layout({
   children: React.ReactNode;
 }) {
   const configured = authConfigured();
+  if (!configured && process.env.NODE_ENV === "production")
+    redirect("/login?setup=required");
   let staff = null;
   if (configured) {
     try {

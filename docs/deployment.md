@@ -1,11 +1,11 @@
 # Secure deployment and operator setup
 
-The authorized hosted project is Vercel `rivox-control` and Supabase `dsfnqlwhexcjqanwnklz`. All 14 application migrations and their history are applied. Production reached `READY` at `https://rivox-control.vercel.app`: login HTTP 200, anonymous APIs HTTP 401, cross-origin mutation HTTP 403 and invalid-account login HTTP 401. CSP, HSTS, `DENY` frame protection and `nosniff` were confirmed. This is an HTTPS/access-control smoke check, not a successful commercial-write test. Local development is optional and is not required for employees.
+The authorized hosted project is Vercel `rivox-control` and Supabase `dsfnqlwhexcjqanwnklz`. All 17 application migrations and their history are applied. Production reached `READY` at `https://rivox-control.vercel.app`: login HTTP 200, anonymous APIs HTTP 401, cross-origin mutation HTTP 403 and invalid-account login HTTP 401. CSP, HSTS, `DENY` frame protection and `nosniff` were confirmed. This is an HTTPS/access-control smoke check, not a successful commercial-write test. Local development is optional and is not required for employees.
 
 ## Supabase
 
 1. Use the private project `dsfnqlwhexcjqanwnklz` or a dedicated staging project first.
-2. The current hosted project already has all migrations through `202611130016_marketplace_operations.sql`, recorded in `supabase_migrations.schema_migrations`. Do not rerun the guarded first-install bundle against its occupied schema. Future changes must be forward migrations. There is no generic SQL endpoint in the app.
+2. The current hosted project already has all migrations through `202611130019_production_verification.sql`, recorded in `supabase_migrations.schema_migrations`. Do not rerun the guarded first-install bundle against its occupied schema. Future changes must be forward migrations. There is no generic SQL endpoint in the app.
 3. Disable public sign-ups. Only invitations issued by the Owner should create membership. Set a strong password policy, email verification, appropriate Supabase Auth rate limits, session lifetime, and TOTP MFA enrollment/verification. Owner/Admin access is denied until the JWT has `aal2`.
 4. Site URL and exact redirects are configured for `https://rivox-control.vercel.app`. The default Supabase email provider restricts recipients to project-team addresses. General SMTP delivery requires an operator-configured provider; Owner-issued private employee links do not depend on SMTP.
 5. The default provider's ordinary email link is supported: it opens the Owner setup page, clears the session fragment and asks for explicit acceptance before setting HTTP-only cookies. The original private setup tab then verifies the matching email before choosing a password. No email template customization is needed. With a custom SMTP provider, the following optional staff template also works:
@@ -27,16 +27,17 @@ The authorized hosted project is Vercel `rivox-control` and Supabase `dsfnqlwhex
 
 Configure in the hosting provider's secure environment settings, never in tracked files:
 
-| Binding                                | Usage                                                                                                             |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | `https://dsfnqlwhexcjqanwnklz.supabase.co`                                                                        |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public browser-safe Supabase project key, not the service-role key                                                |
-| `SUPABASE_SERVICE_ROLE_KEY`            | Restricted server operations: invitation, transactional sync, sanitized integration error recording               |
-| `APP_ORIGIN`                           | Exact origin used for CSRF validation; no trailing path                                                           |
-| `ELDORADO_CLIENT_ID`                   | Fresh seller API client ID                                                                                        |
-| `ELDORADO_CLIENT_SECRET`               | Optional environment alternative to the Owner connection form                                                                                    |
-| `INVENTORY_ENCRYPTION_KEY`             | Persistent raw 32-byte key encoded as 64 hex characters; required for inventory and saved integrations |
-| `RIVOX_DEV_MOCKS`                      | Defaults to false; true only for synthetic local development, always rejected in production                       |
+| Binding                                | Usage                                                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | `https://dsfnqlwhexcjqanwnklz.supabase.co`                                                              |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public browser-safe Supabase project key, not the service-role key                                      |
+| `SUPABASE_SERVICE_ROLE_KEY`            | Restricted server operations: invitation, transactional sync, sanitized integration error recording     |
+| `APP_ORIGIN`                           | Exact origin used for CSRF validation; no trailing path                                                 |
+| `ELDORADO_CLIENT_ID`                   | Fresh seller API client ID                                                                              |
+| `ELDORADO_CLIENT_SECRET`               | Optional environment alternative to the Owner connection form                                           |
+| `INVENTORY_ENCRYPTION_KEY`             | Persistent raw 32-byte key encoded as 64 hex characters; required for inventory and saved integrations  |
+| `CRON_SECRET`                          | App-generated private worker key, encrypted in Vercel and Supabase Vault; operator helper configures it |
+| `RIVOX_DEV_MOCKS`                      | Defaults to false; true only for synthetic local development, always rejected in production             |
 
 Proxy-backed bindings are valid only at their configured destinations; they are not raw values that can be copied to another host. The project's Supabase keys were configured in Vercel through its authorized Management API. Its inventory key was generated once and stored encrypted; preserve it across deployments. The Owner can now configure Eldorado directly in Settings after MFA, without modifying proxy bindings. The existing client ID is fixed by server configuration. An official order read must succeed before saving; failed checks preserve the prior connection. Browser roles have no table/RPC access to stored credentials. AES-256-GCM uses a purpose-derived key and binds the envelope to that client ID. Only the server can decrypt it. Never copy a proxy placeholder into a hosting variable or add duplicate secret bindings.
 
@@ -51,7 +52,8 @@ Rebuild after public binding changes and restart after server binding changes. T
 - Use HTTPS. Set `APP_ORIGIN` and the Supabase Site URL/redirect allowlist to the exact deployment origin.
 - Configure durable monitoring and alerts for integration failures and missing audit records. Current logs are intentionally limited to event/error types; do not add request-body, token, or upstream-response logging.
 - Apply migrations before promoting the application. Verify RLS and staff accounts against the real Supabase gateway.
-- Ensure the static build was made with the intended public Supabase bindings. The setup-only workspace is intentionally visible without credentials and contains no live data.
+- Ensure the static build was made with the intended public Supabase bindings. Production workspace pages require authentication even when configuration is missing; only the development setup preview is available without credentials.
+- Configure the hosted scheduler using `scripts/configure-hosted-automation.py` after migrations and before deploying. It configures the encrypted worker key and the database dispatcher without enabling traffic. After deployment, use `--check-production` to verify the worker diagnostic from both the operator and database HTTP transport. See [hosted operations](hosted-operations.md).
 
 For an operator to automate hosting and hosted migrations, configure `VERCEL_TOKEN` for `api.vercel.com` and `SUPABASE_ACCESS_TOKEN` for `api.supabase.com` in the environment's secure settings. These are provider administration credentials, separate from the Eldorado seller credentials and Supabase application API key. Never commit them or paste them into chat. Declaring these requirements does not create a deployment or grant access.
 

@@ -23,6 +23,7 @@ export function MarketplaceExecution({
     target_id: string;
     payload: {
       marketV1?: boolean;
+      automaticPolicyId?: string;
       change?: MarketplaceChange;
       before?: unknown;
     } | null;
@@ -34,6 +35,12 @@ export function MarketplaceExecution({
     [notice, setNotice] = useState("");
   const cache = useQueryClient(),
     check = ["blocked", "executing"].includes(operation.status);
+  if (operation.payload?.automaticPolicyId && operation.status === "approved")
+    return (
+      <span className="scope-note">
+        Queued under the approved automatic pricing rule.
+      </span>
+    );
   if (
     !operation.payload?.marketV1 ||
     !operation.payload.change ||

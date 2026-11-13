@@ -19,6 +19,7 @@ vi.mock("@/domains/eldorado/client", () => ({
   EldoradoClient: class {
     orders = mocked.orders;
   },
+  eldoradoClient: () => ({ orders: mocked.orders }),
   resetEldoradoClient: mocked.reset,
 }));
 vi.mock("@/domains/eldorado/health", () => ({
@@ -137,4 +138,25 @@ it("protects seller health reads with Owner, same-origin and rate checks", async
   mocked.rate.mockResolvedValueOnce({ data: false });
   expect((await HEALTH(request({}))).status).toBe(429);
   expect(mocked.health).toHaveBeenCalledTimes(1);
+});
+
+it("records a real read from the hosted origin without resubmitting or changing its secret", async () => {
+  const response = await POST(request({ action: "verify" }));
+  expect(response.status).toBe(200);
+  expect(mocked.orders).toHaveBeenCalledOnce();
+  expect(mocked.save).toHaveBeenCalledWith("verify_seller_connection", {
+    actor: "fixture-owner",
+    actor_session: "fixture-session",
+    verification_origin: origin,
+  });
+  expect(mocked.reset).not.toHaveBeenCalled();
+  expect(JSON.stringify(await response.json())).not.toContain(secret);
+});
+
+it("never records hosted verification when its private read fails", async () => {
+  mocked.orders.mockRejectedValue(
+    new AppError("UPSTREAM_AUTH", "Seller access denied.", 403),
+  );
+  expect((await POST(request({ action: "verify" }))).status).toBe(403);
+  expect(mocked.save).not.toHaveBeenCalled();
 });

@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { AppError } from "@/lib/errors";
+import { eldoradoRateStore, type ProviderRateStore } from "./rate-store";
 import {
   resolveSellerCredentials,
   sellerConnectionStatus,
@@ -124,6 +125,7 @@ export class EldoradoClient {
     private credentials: SellerCredentials | (() => Promise<SellerCredentials>),
     private fetcher: typeof fetch = serverFetch,
     private now = Date.now,
+    private rateStore?: ProviderRateStore,
   ) {}
 
   private assertRateLimit() {
@@ -154,11 +156,12 @@ export class EldoradoClient {
           ? Date.parse(retryAfter) - this.now()
           : NaN;
     this.cooldownUntil =
-      this.now() +
-      (Number.isFinite(delta)
-        ? Math.max(1000, Math.min(delta, 900000))
-        : 30000);
-    await this.discard(response);
+      this.now() + (Number.isFinite(delta) ? Math.max(1000, delta) : 30000);
+    try {
+      await this.rateStore?.defer(this.cooldownUntil);
+    } finally {
+      await this.discard(response);
+    }
     this.assertRateLimit();
     throw new AppError(
       "ELDORADO_RATE_LIMITED",
@@ -171,6 +174,7 @@ export class EldoradoClient {
     url: URL | string,
     options: RequestInit,
   ): Promise<Response> {
+    await this.rateStore?.check();
     try {
       const fetcher =
         this.fetcher === serverFetch &&
@@ -388,7 +392,17 @@ export class EldoradoClient {
           cache: "no-store",
         },
       );
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        ["ELDORADO_RATE_LIMITED", "RATE_GATE_UNAVAILABLE"].includes(error.code)
+      )
+        throw new AppError(
+          "ELDORADO_WRITE_NOT_SENT",
+          error.message,
+          error.status,
+          error.retryAfter,
+        );
       throw new AppError(
         "ELDORADO_WRITE_UNKNOWN",
         "The listing change could not be confirmed. Do not submit it again; check its status.",
@@ -524,6 +538,7 @@ export class EldoradoClient {
           offer: z.object({
             id: z.guid(),
             offerState: z.string(),
+            userId: z.string().optional(),
             pricePerUnit: price,
             quantity: z.number().nonnegative(),
             gameId: z.string(),
@@ -575,6 +590,7 @@ export class EldoradoClient {
         ].every((value) => !value?.length);
       return {
         id: offer.id,
+        sellerId: offer.userId ?? null,
         state: offer.offerState,
         price: offer.pricePerUnit.amount,
         currency: offer.pricePerUnit.currency,
@@ -612,6 +628,7 @@ export class EldoradoClient {
   async writeMarketplace(
     rawChange: MarketplaceChange,
     nativeId?: string,
+    beforeSend?: () => Promise<void>,
   ): Promise<{
     acknowledged: true;
     createdId?: string;
@@ -631,6 +648,10 @@ export class EldoradoClient {
       "order.deliver": ["PUT", `/api/v1/orders/me/${id}/deliver`],
       "order.cancel": ["POST", `/api/v1/orders/me/${id}/cancel`],
       "order.extend": ["POST", `/api/v1/orders/me/${id}/extend-delivery-time`],
+      "order.correct": [
+        "POST",
+        `/api/v1/orders/me/${id}/delivery-details/correction`,
+      ],
     } as const;
     let token: string;
     try {
@@ -643,6 +664,7 @@ export class EldoradoClient {
         503,
       );
     }
+    if (beforeSend) await beforeSend();
     const [method, path] = routes[change.kind];
     let response: Response;
     try {
@@ -659,7 +681,17 @@ export class EldoradoClient {
         signal: AbortSignal.timeout(20000),
         cache: "no-store",
       });
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        ["ELDORADO_RATE_LIMITED", "RATE_GATE_UNAVAILABLE"].includes(error.code)
+      )
+        throw new AppError(
+          "ELDORADO_WRITE_NOT_SENT",
+          error.message,
+          error.status,
+          error.retryAfter,
+        );
       throw new AppError(
         "ELDORADO_WRITE_UNKNOWN",
         "The result is uncertain. Check the recorded operation before taking another action.",
@@ -721,6 +753,7 @@ export class EldoradoClient {
   ): Promise<OrderPage> {
     const query: Record<string, string> = {
       displayFilter: "DisplaySellingOrders",
+      isAscendingDateOrder: "false",
       pageSize: "50",
     };
     if (cursor) {
@@ -756,5 +789,6 @@ export function eldoradoClient() {
     resolveSellerCredentials,
     serverFetch,
     Date.now,
+    eldoradoRateStore(),
   ));
 }

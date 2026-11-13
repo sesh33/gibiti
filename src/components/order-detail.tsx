@@ -58,6 +58,8 @@ export function OrderDetail({
     [extensionTime, setExtensionTime] = useState("Hour1"),
     [extensionReason, setExtensionReason] = useState("PreparationDelay"),
     [buyerMessage, setBuyerMessage] = useState(""),
+    [automaticDelivery, setAutomaticDelivery] = useState(false),
+    [fulfilled, setFulfilled] = useState(false),
     [note, setNote] = useState(""),
     [notice, setNotice] = useState(""),
     [action, setAction] = useState<string | null>(null),
@@ -68,6 +70,15 @@ export function OrderDetail({
     queryKey: ["order", id],
     queryFn: () => api<{ order: Detail }>(`/api/orders/${id}`),
     enabled: configured,
+  });
+  const automation = useQuery({
+    queryKey: ["automation-settings"],
+    queryFn: () =>
+      api<{ settings: { autoDeliveryEnabled: boolean } }>(
+        "/api/automation/settings",
+      ),
+    enabled: configured,
+    retry: false,
   });
   const noteMutation = useMutation({
     mutationFn: () =>
@@ -87,19 +98,24 @@ export function OrderDetail({
       const change = (
         action === "orders.deliver"
           ? { kind: "order.deliver" }
-          : action === "orders.cancel"
+          : action === "orders.correct"
             ? {
-                kind: "order.cancel",
-                body: { reason: cancelReason, message: buyerMessage || null },
+                kind: "order.correct",
+                body: { message: buyerMessage.trim() || null },
               }
-            : {
-                kind: "order.extend",
-                body: {
-                  time: extensionTime,
-                  reason: extensionReason,
-                  message: buyerMessage || null,
-                },
-              }
+            : action === "orders.cancel"
+              ? {
+                  kind: "order.cancel",
+                  body: { reason: cancelReason, message: buyerMessage || null },
+                }
+              : {
+                  kind: "order.extend",
+                  body: {
+                    time: extensionTime,
+                    reason: extensionReason,
+                    message: buyerMessage || null,
+                  },
+                }
       ) as MarketplaceChange;
       return api("/api/marketplace/requests", {
         method: "POST",
@@ -107,6 +123,9 @@ export function OrderDetail({
           change,
           expectedSnapshot: detail.data?.order.synced_at,
           confirm: true,
+          ...(action === "orders.deliver" && automaticDelivery
+            ? { automaticDelivery: true, fulfillmentConfirmed: fulfilled }
+            : {}),
           target: id,
           reason,
           idempotencyKey: requestKey,
@@ -145,6 +164,9 @@ export function OrderDetail({
   });
   const order = detail.data?.order;
   function request(action: string) {
+    setAutomaticDelivery(false);
+    setFulfilled(false);
+    setBuyerMessage("");
     setAction(action);
     setReason("");
     setRequestKey(crypto.randomUUID());
@@ -301,6 +323,13 @@ export function OrderDetail({
                 <XCircle size={14} />
                 Request cancellation
               </Button>
+              <Button
+                variant="outline"
+                disabled={order.state !== "Delivered"}
+                onClick={() => request("orders.correct")}
+              >
+                Request delivery-note correction
+              </Button>
             </section>
             <section className="data-panel action-panel">
               <h3>
@@ -349,6 +378,17 @@ export function OrderDetail({
             This creates an audited request only. It does not change the order
             in Eldorado. A different authorized reviewer must decide.
           </DialogDescription>
+          <div className="review-summary">
+            <span>Order</span>
+            <code>{id}</code>
+            <span>Product / buyer / quantity</span>
+            <strong>
+              {order?.product_title} · {order?.buyer_username} ·{" "}
+              {order?.quantity}
+            </strong>
+            <span>Current state</span>
+            <strong>{order?.state}</strong>
+          </div>
           <label className="field-label">
             Action
             <input readOnly value={action ?? ""} />
@@ -410,7 +450,9 @@ export function OrderDetail({
           )}
           {action !== "orders.deliver" && (
             <label className="field-label">
-              Optional explanation for Eldorado
+              {action === "orders.correct"
+                ? "Correction note"
+                : "Optional explanation for Eldorado"}
               <textarea
                 value={buyerMessage}
                 maxLength={2000}
@@ -418,8 +460,52 @@ export function OrderDetail({
               />
             </label>
           )}
+          {action === "orders.correct" && (
+            <p className="scope-note">
+              This submits a correction note to Eldorado for a Delivered order.
+              Keep passwords, recovery codes and payment details out of the
+              note.
+            </p>
+          )}
+          {action === "orders.deliver" &&
+            automation.data?.settings.autoDeliveryEnabled && (
+              <>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={automaticDelivery}
+                    onChange={(event) => {
+                      setAutomaticDelivery(event.target.checked);
+                      setFulfilled(false);
+                    }}
+                  />
+                  After independent approval, let the hosted service mark this
+                  order delivered.
+                </label>
+                {automaticDelivery && (
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={fulfilled}
+                      onChange={(event) => setFulfilled(event.target.checked)}
+                    />
+                    I have completed and verified the actual transfer for this
+                    exact order.
+                  </label>
+                )}
+                <p className="scope-note">
+                  Automatic marking requires MFA at request time and a different
+                  authorized reviewer. It never transfers goods in the game.
+                </p>
+              </>
+            )}
           <Button
-            disabled={reason.trim().length < 10 || approval.isPending}
+            disabled={
+              reason.trim().length < 10 ||
+              approval.isPending ||
+              (automaticDelivery && !fulfilled) ||
+              (action === "orders.correct" && !buyerMessage.trim())
+            }
             onClick={() => approval.mutate()}
           >
             {approval.isPending ? "Submitting..." : "Confirm approval request"}

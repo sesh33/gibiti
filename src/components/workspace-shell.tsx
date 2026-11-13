@@ -29,6 +29,12 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 const navigation = [
+  {
+    label: "Automation & pricing",
+    href: "/automation",
+    icon: Gauge,
+    permission: "offers.update_price",
+  },
   { label: "Reply library", href: "/templates", icon: MessageSquareText },
   {
     label: "Offers",

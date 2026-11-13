@@ -35,21 +35,47 @@ export function OrderCenter({ configured }: { configured: boolean }) {
   const [search, setSearch] = useState(params.get("search") ?? ""),
     [notice, setNotice] = useState(""),
     [upstreamCursor, setUpstreamCursor] = useState<string | null>(null);
-  const [polling, setPolling] = useState(false),
-    [pollSeconds, setPollSeconds] = useState(60);
   const access = useQuery({
     queryKey: ["me"],
     queryFn: () => api<{ permissions: string[] }>("/api/me"),
     enabled: configured,
   });
   const canSync = Boolean(access.data?.permissions.includes("orders.read"));
+  const preferences = useQuery({
+    queryKey: ["staff-preferences"],
+    queryFn: () =>
+      api<{ orderPollingEnabled: boolean; orderPollingSeconds: number }>(
+        "/api/preferences",
+      ),
+    enabled: configured && canSync,
+    retry: false,
+  });
+  const savePreferences = useMutation({
+    mutationFn: (next: {
+      orderPollingEnabled: boolean;
+      orderPollingSeconds: number;
+    }) =>
+      api<{ orderPollingEnabled: boolean; orderPollingSeconds: number }>(
+        "/api/preferences",
+        { method: "POST", body: JSON.stringify(next) },
+      ),
+    onSuccess: (data) => cache.setQueryData(["staff-preferences"], data),
+    onError: (error) => setNotice(error.message),
+  });
+  const polling = preferences.data?.orderPollingEnabled ?? false,
+    pollSeconds = preferences.data?.orderPollingSeconds ?? 60;
   useEffect(() => {
     if (!configured || !polling || !canSync) return;
     let cancelled = false,
       timer: ReturnType<typeof setTimeout> | undefined,
-      delay = pollSeconds * 1000;
+      delay = pollSeconds * 1000,
+      notBefore = Date.now() + pollSeconds * 1000;
     async function poll() {
       if (cancelled) return;
+      if (Date.now() < notBefore) {
+        timer = setTimeout(poll, Math.min(notBefore - Date.now(), 2147483647));
+        return;
+      }
       if (!document.hidden) {
         try {
           await api("/api/orders/sync", { method: "POST", body: "{}" });
@@ -68,9 +94,12 @@ export function OrderCenter({ configured }: { configured: boolean }) {
           );
         }
       }
-      if (!cancelled) timer = setTimeout(poll, delay);
+      if (!cancelled) {
+        notBefore = Date.now() + delay;
+        timer = setTimeout(poll, Math.min(delay, 2147483647));
+      }
     }
-    timer = setTimeout(poll, delay);
+    timer = setTimeout(poll, Math.min(delay, 2147483647));
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -145,7 +174,13 @@ export function OrderCenter({ configured }: { configured: boolean }) {
             <input
               type="checkbox"
               checked={polling}
-              onChange={(event) => setPolling(event.target.checked)}
+              disabled={!preferences.isSuccess || savePreferences.isPending}
+              onChange={(event) =>
+                savePreferences.mutate({
+                  orderPollingEnabled: event.target.checked,
+                  orderPollingSeconds: pollSeconds,
+                })
+              }
             />
             Auto-sync new orders while this page is visible
           </label>
@@ -153,7 +188,14 @@ export function OrderCenter({ configured }: { configured: boolean }) {
             Read interval
             <select
               value={pollSeconds}
-              onChange={(event) => setPollSeconds(Number(event.target.value))}
+              aria-label="Read interval"
+              disabled={!preferences.isSuccess || savePreferences.isPending}
+              onChange={(event) =>
+                savePreferences.mutate({
+                  orderPollingEnabled: polling,
+                  orderPollingSeconds: Number(event.target.value),
+                })
+              }
             >
               {[30, 60, 120, 300].map((value) => (
                 <option key={value} value={value}>

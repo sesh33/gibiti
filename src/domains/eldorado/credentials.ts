@@ -83,7 +83,7 @@ async function storedCredentials() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
   const { data, error } = await supabaseAdmin()
     .from("integration_credentials")
-    .select("client_id,encrypted_secret,verified_at")
+    .select("client_id,encrypted_secret,verified_at,verified_origin")
     .eq("provider", "eldorado")
     .maybeSingle();
   if (error)
@@ -96,6 +96,7 @@ async function storedCredentials() {
     client_id: string;
     encrypted_secret: string;
     verified_at: string;
+    verified_origin: string | null;
   } | null;
 }
 export async function sellerConnectionStatus() {
@@ -107,6 +108,7 @@ export async function sellerConnectionStatus() {
         : process.env.ELDORADO_CLIENT_ID && process.env.ELDORADO_CLIENT_SECRET,
     ),
     verifiedAt: row?.verified_at ?? null,
+    verifiedOrigin: row?.verified_origin ?? null,
     clientId: process.env.ELDORADO_CLIENT_ID ?? null,
   };
 }

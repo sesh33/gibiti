@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { money } from "@/lib/utils";
 import type { OrderStateBucket } from "@/domains/orders/states";
+import { OperationalSummary } from "@/components/operational-summary";
 type Metrics = {
   orders: number;
   completed: number;
@@ -99,6 +100,7 @@ export function Overview({ configured }: { configured: boolean }) {
         ))}
       </div>
       {query.isError && <QueryError message={query.error.message} />}
+      <OperationalSummary configured={configured} />
       {stateBreakdown.length > 0 && (
         <section
           className="data-panel"
@@ -206,7 +208,7 @@ export function Overview({ configured }: { configured: boolean }) {
             )}
           </div>
           <div>
-            <Clock3 size={16} /> Official messaging access required
+            <Clock3 size={16} /> Reply library available to copy
           </div>
           <Link href="/settings" className="empty-link">
             Workspace configuration
