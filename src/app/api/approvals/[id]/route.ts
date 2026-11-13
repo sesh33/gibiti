@@ -30,7 +30,7 @@ export async function PATCH(
       );
     const { data } = await staff.db
       .from("approval_requests")
-      .select("status")
+      .select("status,payload")
       .eq("id", target)
       .single();
     return NextResponse.json({
@@ -39,7 +39,9 @@ export async function PATCH(
       message:
         data?.status === "succeeded"
           ? "Approved internal operation applied. Review the audit log for its result."
-          : "Decision recorded. External execution remains disabled until the official write contract is verified.",
+          : data?.status === "approved" && data.payload?.marketV1
+            ? "Approved. An authorized participant can execute this exact request once from Approvals."
+            : "Decision recorded. This request has no enabled external executor.",
     });
   } catch (error) {
     return errorResponse(error);

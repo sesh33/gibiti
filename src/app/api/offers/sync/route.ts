@@ -10,8 +10,11 @@ export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
     const staff = await requireStaff("offers.read");
-    const { source } = z
-      .object({ source: z.enum(["all", ...offerSources]).default("all") })
+    const { source, pageIndex } = z
+      .object({
+        source: z.enum(["all", ...offerSources]).default("all"),
+        pageIndex: z.number().int().min(1).max(1000).default(1),
+      })
       .parse(await readBody(request));
     const { data: allowed, error } = await staff.db.rpc("consume_rate_limit", {
       bucket: "operations.write",
@@ -34,6 +37,7 @@ export async function POST(request: Request) {
               staff.user.id,
               staff.sessionId,
               selected,
+              pageIndex,
             )),
           };
         } catch (error) {

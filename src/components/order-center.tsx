@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDownUp,
   ArrowUpRight,
@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyState, QueryError } from "@/components/empty-state";
-import { api } from "@/lib/api-client";
+import { api, ApiError } from "@/lib/api-client";
 import { money } from "@/lib/utils";
 import { orderStateOptions } from "@/domains/orders/states";
 export type OrderRow = {
@@ -35,6 +35,47 @@ export function OrderCenter({ configured }: { configured: boolean }) {
   const [search, setSearch] = useState(params.get("search") ?? ""),
     [notice, setNotice] = useState(""),
     [upstreamCursor, setUpstreamCursor] = useState<string | null>(null);
+  const [polling, setPolling] = useState(false),
+    [pollSeconds, setPollSeconds] = useState(60);
+  const access = useQuery({
+    queryKey: ["me"],
+    queryFn: () => api<{ permissions: string[] }>("/api/me"),
+    enabled: configured,
+  });
+  const canSync = Boolean(access.data?.permissions.includes("orders.read"));
+  useEffect(() => {
+    if (!configured || !polling || !canSync) return;
+    let cancelled = false,
+      timer: ReturnType<typeof setTimeout> | undefined,
+      delay = pollSeconds * 1000;
+    async function poll() {
+      if (cancelled) return;
+      if (!document.hidden) {
+        try {
+          await api("/api/orders/sync", { method: "POST", body: "{}" });
+          if (cancelled) return;
+          delay = pollSeconds * 1000;
+          await cache.invalidateQueries({ queryKey: ["orders"] });
+        } catch (error) {
+          if (cancelled) return;
+          delay = Math.max(
+            pollSeconds * 1000,
+            Math.min(900000, delay * 2),
+            error instanceof ApiError ? (error.retryAfter ?? 0) * 1000 : 0,
+          );
+          setNotice(
+            `${error instanceof Error ? error.message : "Order sync unavailable."} Auto-sync will wait before trying another read.`,
+          );
+        }
+      }
+      if (!cancelled) timer = setTimeout(poll, delay);
+    }
+    timer = setTimeout(poll, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [configured, polling, canSync, pollSeconds, cache]);
   const state = params.get("state") ?? "all",
     sort = params.get("sort") ?? "newest";
   const orders = useQuery({
@@ -80,7 +121,7 @@ export function OrderCenter({ configured }: { configured: boolean }) {
       >
         <Button
           variant="outline"
-          disabled={!configured || sync.isPending}
+          disabled={!configured || !canSync || sync.isPending}
           onClick={() => sync.mutate()}
         >
           <RefreshCw size={14} className={sync.isPending ? "spin" : ""} />
@@ -98,6 +139,36 @@ export function OrderCenter({ configured }: { configured: boolean }) {
           you have synchronized and your permissions.
         </span>
       </div>
+      {canSync && (
+        <div className="reply-toolbar">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={polling}
+              onChange={(event) => setPolling(event.target.checked)}
+            />
+            Auto-sync new orders while this page is visible
+          </label>
+          <label className="field-label">
+            Read interval
+            <select
+              value={pollSeconds}
+              onChange={(event) => setPollSeconds(Number(event.target.value))}
+            >
+              {[30, 60, 120, 300].map((value) => (
+                <option key={value} value={value}>
+                  {value} seconds
+                </option>
+              ))}
+            </select>
+          </label>
+          {upstreamCursor && (
+            <Button variant="ghost" onClick={() => setUpstreamCursor(null)}>
+              Restart API pagination
+            </Button>
+          )}
+        </div>
+      )}
       {notice && (
         <p role="status" className="inline-feedback">
           {notice}

@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { RoleProfiles, type RoleProfile } from "@/components/role-profiles";
 import { InventoryActions } from "@/components/inventory-actions";
+import { MarketplaceExecution } from "@/components/marketplace-execution";
+import type { MarketplaceChange } from "@/domains/eldorado/contracts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Layers3, Plus, ShieldCheck, X } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -52,6 +54,9 @@ type Approval = {
   created_at: string;
   decision_reason: string | null;
   payload: {
+    marketV1?: boolean;
+    change?: MarketplaceChange;
+    before?: unknown;
     role?: string;
     active?: boolean;
     overrides?: { permission: string; allowed: boolean }[];
@@ -780,9 +785,9 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
       <div className="info-banner">
         <ShieldCheck size={15} />
         <span>
-          Approved access changes apply internally and revoke sessions. Eldorado
-          writes remain blocked pending verified contracts and explicit
-          authorization.
+          Access changes apply internally and revoke sessions. Documented
+          Eldorado operations require independent approval, followed by explicit
+          execution with MFA. Check uncertain outcomes before another change.
         </span>
       </div>
       {notice && (
@@ -816,6 +821,7 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
                         <span className="state-badge">{item.status}</span>
                       </td>
                       <td>
+                        <MarketplaceExecution operation={item} />
                         <Button
                           size="sm"
                           variant="ghost"
@@ -851,8 +857,9 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
         <DialogContent>
           <DialogTitle>Review operational request</DialogTitle>
           <DialogDescription>
-            Self-approval is prohibited. Approved access changes apply
-            immediately; external actions remain disabled.
+            Self-approval is prohibited. Access changes apply immediately.
+            Approved marketplace requests require a separate execution
+            confirmation with MFA.
           </DialogDescription>
           <div className="review-summary">
             <span>Requested action</span>
@@ -892,6 +899,21 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
             )}
           </div>
           <p className="review-reason">{selected?.reason}</p>
+          {selected?.payload?.marketV1 && (
+            <>
+              <p>Exact requested marketplace change</p>
+              <pre className="market-json">
+                {JSON.stringify(selected.payload.change, null, 2)}
+              </pre>
+              <p>Current values recorded with this request</p>
+              <pre className="market-json">
+                {JSON.stringify(selected.payload.before, null, 2)}
+              </pre>
+              <p className="scope-note">
+                Complete MFA before approving marketplace operations.
+              </p>
+            </>
+          )}
           <label className="field-label">
             Decision reason
             <textarea

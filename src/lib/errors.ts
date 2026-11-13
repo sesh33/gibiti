@@ -5,6 +5,7 @@ export class AppError extends Error {
     public code: string,
     message: string,
     public status = 400,
+    public retryAfter?: number,
   ) {
     super(message);
   }
@@ -13,7 +14,19 @@ export function errorResponse(error: unknown) {
   if (error instanceof AppError)
     return NextResponse.json(
       { error: { code: error.code, message: error.message } },
-      { status: error.status, headers: { "Cache-Control": "no-store" } },
+      {
+        status: error.status,
+        headers: {
+          "Cache-Control": "no-store",
+          ...(error.status === 429
+            ? {
+                "Retry-After": String(
+                  Math.max(1, Math.ceil(error.retryAfter ?? 60)),
+                ),
+              }
+            : {}),
+        },
+      },
     );
   if (error instanceof ZodError)
     return NextResponse.json(

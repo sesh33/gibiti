@@ -39,6 +39,7 @@ test("all operational modules render with zero invented account data", async ({
     ["/overview", "A clearer view of your operation."],
     ["/orders", "Order center"],
     ["/offers", "Offers, without the clutter."],
+    ["/offers/edit", "Create a predefined offer."],
     ["/team", "Your team. Your rules."],
     ["/approvals", "A deliberate second look."],
     ["/activity", "Every action leaves a record."],
@@ -104,4 +105,41 @@ test("sign-in reports missing auth configuration without accepting secrets", asy
   await expect(page.getByRole("textbox", { name: "Work email" })).toHaveCount(
     0,
   );
+});
+
+test("team replies require order details and can be copied without sending messages", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/templates");
+  await expect(
+    page.getByRole("heading", { name: "Better replies. Ready to copy." }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: /Donut SMP · delivery details/ })
+    .click();
+  await expect(page.getByRole("button", { name: "Copy reply" })).toBeDisabled();
+  await page.getByLabel("Coin amount (include M or B)").fill("15M");
+  await page.getByRole("button", { name: "Copy reply" }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+    "15M Donut SMP coins",
+  );
+  await expect(
+    page.getByText("Reply copied. No message was sent."),
+  ).toBeVisible();
+  await page.getByLabel("Language", { exact: true }).selectOption("FR");
+  await expect(
+    page.getByRole("button", { name: /Robux · lien du pass/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Robux · lien du pass/ }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Prepared reply" }),
+  ).toHaveValue(/Bonjour/);
+  await page.setViewportSize({ width: 390, height: 900 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

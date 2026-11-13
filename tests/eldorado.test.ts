@@ -44,7 +44,7 @@ it("retries a read once after a rejected token and preserves cursor", async () =
       return Response.json({ accessToken: "fixture-token", expiresIn: 900 });
     }
     reads++;
-    expect(new URL(String(input)).searchParams.get("cursor")).toBe(
+    expect(new URL(String(input)).searchParams.get("cursorValue")).toBe(
       "fixture-cursor",
     );
     return reads === 1
@@ -55,7 +55,6 @@ it("retries a read once after a rejected token and preserves cursor", async () =
     { clientId: "fixture", clientSecret: "fixture" },
     fetcher,
     Date.now,
-    { cursorParameter: "cursor" },
   );
   await client.orders("fixture-cursor");
   expect(auth).toBe(2);
@@ -93,16 +92,33 @@ it("drops tracking data and never persists the raw buyer payload", async () => {
   expect(normalized.product_title).toBe("Fixture product");
 });
 
-it("refuses to guess an undocumented upstream pagination parameter", async () => {
+it("accepts documented nullable cancellation and dispute messages", async () => {
+  const { upstreamOrder } = await import("@/domains/eldorado/client");
+  const parsed = upstreamOrder.parse({
+    ...synthetic,
+    cancelation: { reason: "Mutual_Agreement", message: null },
+    latestDispute: { reason: "Other", message: null },
+  });
+  expect(parsed.cancelation?.message).toBeNull();
+  expect(parsed.latestDispute?.message).toBeNull();
+});
+
+it("uses the supplied selling-order cursor contract", async () => {
   const client = new EldoradoClient(
     { clientId: "fixture", clientSecret: "fixture" },
-    async () => {
-      throw new Error("Should not call upstream");
+    async (input) => {
+      if (String(input).endsWith("/token"))
+        return Response.json({ accessToken: "fixture", expiresIn: 900 });
+      const query = new URL(String(input)).searchParams;
+      expect(query.get("displayFilter")).toBe("DisplaySellingOrders");
+      expect(query.get("cursorValue")).toBe("next-cursor");
+      expect(query.get("pageDirection")).toBe("Previous");
+      expect(query.get("pageSize")).toBe("50");
+      expect(query.has("pageIndex")).toBe(false);
+      return Response.json({ results: [] });
     },
   );
-  await expect(client.orders("cursor")).rejects.toThrow(
-    "ELDORADO_CURSOR_PARAMETER",
-  );
+  await client.orders("next-cursor", "Previous");
 });
 
 it("uses the canonical origin directly and normalizes documented nullable product titles", async () => {

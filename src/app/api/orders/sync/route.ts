@@ -9,8 +9,11 @@ export async function POST(request: Request) {
   try {
     requireSameOrigin(request);
     const staff = await requireStaff("orders.read");
-    const { cursor } = z
-      .object({ cursor: z.string().max(2000).optional() })
+    const { cursor, direction } = z
+      .object({
+        cursor: z.string().max(2000).optional(),
+        direction: z.enum(["Next", "Previous"]).default("Next"),
+      })
       .parse(await readBody(request));
     const { data: allowed, error } = await staff.db.rpc("consume_rate_limit", {
       bucket: "orders.sync",
@@ -24,7 +27,12 @@ export async function POST(request: Request) {
         429,
       );
     return NextResponse.json(
-      await synchronizeOrders(staff.user.id, staff.sessionId, cursor),
+      await synchronizeOrders(
+        staff.user.id,
+        staff.sessionId,
+        cursor,
+        direction,
+      ),
     );
   } catch (error) {
     return errorResponse(error);

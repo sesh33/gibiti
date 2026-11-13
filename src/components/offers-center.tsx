@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
@@ -111,6 +112,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
     pathname = usePathname(),
     cache = useQueryClient();
   const [search, setSearch] = useState(params.get("search") ?? ""),
+    [predefinedPage, setPredefinedPage] = useState(1),
     [results, setResults] = useState<SyncResult[]>([]),
     [feedback, setFeedback] = useState(""),
     [selected, setSelected] = useState<OfferRecord | null>(null),
@@ -145,12 +147,21 @@ export function OffersCenter({ configured }: { configured: boolean }) {
   const canChange = canManage && history.isSuccess;
   const synchronize = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/offers/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source }),
-      });
-      const data = await response.json();
+      const data = await api<{
+        results: SyncResult[];
+        error?: { message?: string };
+      }>(
+        "/api/offers/sync",
+        {
+          method: "POST",
+          body: JSON.stringify({ source, pageIndex: predefinedPage }),
+        },
+        (body) =>
+          !!body &&
+          typeof body === "object" &&
+          "results" in body &&
+          Array.isArray(body.results),
+      );
       if (Array.isArray(data.results)) {
         setResults(data.results);
         return data as { results: SyncResult[] };
@@ -256,16 +267,22 @@ export function OffersCenter({ configured }: { configured: boolean }) {
     };
     remember(offerId, attempt);
     try {
-      const response = await fetch("/api/offers/availability", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-      });
-      const result = (await response.json()) as {
+      const result = await api<{
         operation?: AvailabilityOperation;
         message?: string;
         error?: { message?: string };
-      };
+      }>(
+        "/api/offers/availability",
+        {
+          method: "POST",
+          body: JSON.stringify(request),
+        },
+        (body) =>
+          !!body &&
+          typeof body === "object" &&
+          "operation" in body &&
+          !!body.operation,
+      );
       if (!result.operation)
         throw new Error(
           result.error?.message ??
@@ -358,6 +375,11 @@ export function OffersCenter({ configured }: { configured: boolean }) {
         title="Offers, without the clutter."
         description="Your real listings, with controlled availability changes and a record of every action."
       >
+        {access.data?.permissions.includes("offers.create") && (
+          <Button asChild>
+            <Link href="/offers/edit">Create predefined offer</Link>
+          </Button>
+        )}
         <Button
           variant="outline"
           disabled={!configured || synchronize.isPending}
@@ -383,9 +405,26 @@ export function OffersCenter({ configured }: { configured: boolean }) {
           {canManage
             ? "Pause or resume one verified listing at a time. Changes are sent to Eldorado only after your confirmation and recorded for audit."
             : "Read your authorized listing inventory. Availability changes require a separate staff permission."}{" "}
-          Price, quantity, deletion, and bulk changes are not enabled here.
+          Predefined price, quantity and details are available through Edit /
+          compare with independent review. Deletion and bulk changes are
+          disabled.
         </span>
       </div>
+      {(source === "all" || source === "predefined") && (
+        <label className="select-label">
+          Predefined API page
+          <input
+            aria-label="Predefined API page"
+            type="number"
+            min="1"
+            max="1000"
+            value={predefinedPage}
+            onChange={(event) =>
+              setPredefinedPage(Number(event.target.value) || 1)
+            }
+          />
+        </label>
+      )}
       {canManage && history.isError && (
         <QueryError
           message="Availability history could not be verified. Changes are disabled until the operation records can be read."
@@ -578,7 +617,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                     <th>Unit price</th>
                     <th>Available</th>
                     <th>Last read</th>
-                    <th>Availability control</th>
+                    <th>Listing controls</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -615,6 +654,14 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                           {new Date(offer.updated_at).toLocaleString("en-US")}
                         </td>
                         <td className="catalog-control-cell">
+                          {offer.source === "predefined" && (
+                            <Link
+                              className="button button-outline button-sm"
+                              href={`/offers/edit?id=${encodeURIComponent(offer.id)}`}
+                            >
+                              Edit / compare
+                            </Link>
+                          )}
                           {canManage ? (
                             <>
                               <Button

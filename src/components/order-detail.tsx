@@ -22,7 +22,14 @@ import {
 import { PageHeading } from "@/components/page-heading";
 import { EmptyState, QueryError } from "@/components/empty-state";
 import type { OrderRow } from "./order-center";
+import {
+  cancelReasons,
+  extensionTimes,
+  extensionReasons,
+  type MarketplaceChange,
+} from "@/domains/eldorado/contracts";
 type Detail = OrderRow & {
+  synced_at: string;
   delivery_time: string | null;
   delivery_method: string | null;
   details: {
@@ -47,6 +54,10 @@ export function OrderDetail({
   configured: boolean;
 }) {
   const cache = useQueryClient(),
+    [cancelReason, setCancelReason] = useState("Out_Of_Stock"),
+    [extensionTime, setExtensionTime] = useState("Hour1"),
+    [extensionReason, setExtensionReason] = useState("PreparationDelay"),
+    [buyerMessage, setBuyerMessage] = useState(""),
     [note, setNote] = useState(""),
     [notice, setNotice] = useState(""),
     [action, setAction] = useState<string | null>(null),
@@ -72,16 +83,36 @@ export function OrderDetail({
     onError: (e) => setNotice(e.message),
   });
   const approval = useMutation({
-    mutationFn: () =>
-      api("/api/approvals", {
+    mutationFn: () => {
+      const change = (
+        action === "orders.deliver"
+          ? { kind: "order.deliver" }
+          : action === "orders.cancel"
+            ? {
+                kind: "order.cancel",
+                body: { reason: cancelReason, message: buyerMessage || null },
+              }
+            : {
+                kind: "order.extend",
+                body: {
+                  time: extensionTime,
+                  reason: extensionReason,
+                  message: buyerMessage || null,
+                },
+              }
+      ) as MarketplaceChange;
+      return api("/api/marketplace/requests", {
         method: "POST",
         body: JSON.stringify({
-          action,
+          change,
+          expectedSnapshot: detail.data?.order.synced_at,
+          confirm: true,
           target: id,
           reason,
           idempotencyKey: requestKey,
         }),
-      }),
+      });
+    },
     onSuccess: () => {
       setAction(null);
       setReason("");
@@ -243,13 +274,14 @@ export function OrderDetail({
                 Controlled actions
               </h3>
               <p>
-                Requests are reviewed before execution. Live delivery and
-                cancellation are not enabled until their official contracts are
-                verified.
+                An independent reviewer approves the exact request. An
+                authorized participant then confirms execution in Approvals.
+                Only open, paid orders are eligible here.
               </p>
               <Button
                 variant="outline"
                 onClick={() => request("orders.deliver")}
+                disabled={!["Paid"].includes(order.state)}
               >
                 <CheckCircle2 size={14} />
                 Request delivery
@@ -257,12 +289,14 @@ export function OrderDetail({
               <Button
                 variant="outline"
                 onClick={() => request("orders.update_delivery")}
+                disabled={!["Paid"].includes(order.state)}
               >
-                Request delivery update
+                Request deadline extension
               </Button>
               <Button
                 variant="destructive"
                 onClick={() => request("orders.cancel")}
+                disabled={!["Paid"].includes(order.state)}
               >
                 <XCircle size={14} />
                 Request cancellation
@@ -328,6 +362,62 @@ export function OrderDetail({
               placeholder="Explain why this action is needed (at least 10 characters)."
             />
           </label>
+          {action === "orders.cancel" && (
+            <label className="field-label">
+              Cancellation reason
+              <select
+                aria-label="Cancellation reason"
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+              >
+                {cancelReasons.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {action === "orders.update_delivery" && (
+            <>
+              <label className="field-label">
+                Additional time
+                <select
+                  aria-label="Additional time"
+                  value={extensionTime}
+                  onChange={(event) => setExtensionTime(event.target.value)}
+                >
+                  {extensionTimes
+                    .filter((value) => value !== "None")
+                    .map((value) => (
+                      <option key={value}>{value}</option>
+                    ))}
+                </select>
+              </label>
+              <label className="field-label">
+                Extension reason
+                <select
+                  aria-label="Extension reason"
+                  value={extensionReason}
+                  onChange={(event) => setExtensionReason(event.target.value)}
+                >
+                  {extensionReasons
+                    .filter((value) => value !== "None")
+                    .map((value) => (
+                      <option key={value}>{value}</option>
+                    ))}
+                </select>
+              </label>
+            </>
+          )}
+          {action !== "orders.deliver" && (
+            <label className="field-label">
+              Optional explanation for Eldorado
+              <textarea
+                value={buyerMessage}
+                maxLength={2000}
+                onChange={(event) => setBuyerMessage(event.target.value)}
+              />
+            </label>
+          )}
           <Button
             disabled={reason.trim().length < 10 || approval.isPending}
             onClick={() => approval.mutate()}

@@ -17,6 +17,7 @@ import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { QueryError } from "@/components/empty-state";
+import { EldoradoConnection } from "@/components/eldorado-connection";
 const required = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
@@ -116,6 +117,7 @@ export function Settings({ configured }: { configured: boolean }) {
         </div>
       </section>
       <div className="settings-grid">
+        <EldoradoConnection configured={configured} />
         <section className="data-panel settings-section">
           <div className="settings-heading">
             <span className="settings-icon">
@@ -231,13 +233,13 @@ export function Settings({ configured }: { configured: boolean }) {
               </span>
             </div>
             <div>
-              <span>Delivery, price and quantity changes</span>
+              <span>Predefined edits & eligible order actions</span>
               <span
                 className={`pill ${status.data?.liveWrites ? "pill-blue" : "pill-muted"}`}
               >
                 {status.data?.liveWrites
-                  ? "Authorized operations enabled"
-                  : "Contract verification required"}
+                  ? "Approval and MFA required"
+                  : "Connect Seller API"}
               </span>
             </div>
           </div>

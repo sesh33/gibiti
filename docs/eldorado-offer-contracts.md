@@ -74,3 +74,11 @@ An authorized operator can unblock implementation by exporting the OpenAPI docum
 | Item details | `PUT /api/v1/item-management/me/offers/item/{offerId}/details` |
 
 An export must omit authorization headers, client secrets, account credentials, and real buyer information. Payload discovery must not use live price/quantity changes, invalid-target mutation probes, authenticated UI scraping, or attempts to bypass Swagger authorization. Until these contracts are available, pause/resume is the only implemented upstream editing action; this release must not be described as complete offer editing.
+
+## Latest access check: 2026-11-13
+
+The user-supplied Swagger index was opened in Chromium with a fresh Seller bearer token sent only to the official Swagger origin/path. It returned 403 with `User is unauthorized to access Swagger` and zero operation blocks. The seller-api-docs endpoint returned 200 with brief textual route-family notes; it was not an OpenAPI document and supplied no write DTOs. Newly supplied Swap routes are acknowledged, but request/response contracts are still needed before enabling Swap operations. The access-token credentials remain valid for the verified order, listing and status reads.
+
+## Supplied contracts now implemented
+
+After the blocked browser check, the user supplied the extracted request schemas and response/status contracts in this conversation. See [the current Seller contract handoff](eldorado-seller-contracts.md). The previous missing-contract status is historical: reviewed predefined creation/details/price/quantity and v1 order delivery/cancellation/extensions are now implemented. Other catalog-family edit bodies, bulk actions, deletion and gift-card secret import DTOs remain unimplemented. Predefined source pagination and documented selling-order cursors are supported.

@@ -78,7 +78,7 @@ export async function GET(request: Request) {
             : null,
         sync: sync ?? [],
         scope:
-          "Synchronized source records may overlap. Availability actions require separate authorization and confirmation; upstream pagination remains unverified.",
+          "Synchronized source records may overlap. Predefined source pages can be selected during sync. Other source pagination is not enabled. Edits require their own permissions and confirmation.",
       },
       { headers: { "Cache-Control": "no-store" } },
     );

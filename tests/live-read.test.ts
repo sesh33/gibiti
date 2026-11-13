@@ -2,11 +2,17 @@ import { it, expect } from "vitest";
 import { eldoradoClient } from "@/domains/eldorado/client";
 import { normalizeOrder } from "@/domains/orders/service";
 import { readSellerOfferPage } from "@/domains/offers/service";
+import { comparePredefinedOffers } from "@/domains/offers/comparison";
 const enabled = process.env.RIVOX_LIVE_READS === "true";
 it.skipIf(!enabled)(
   "validates authorized real order reads and normalization without upstream mutations",
   async () => {
     const page = await eldoradoClient().orders();
+    if (page.nextPageCursor) {
+      const next = await eldoradoClient().orders(page.nextPageCursor);
+      const seen = new Set(page.results.map((order) => order.id));
+      expect(next.results.some((order) => seen.has(order.id))).toBe(false);
+    }
     for (const order of page.results) {
       const normalized = normalizeOrder(order);
       expect(normalized.id).toBe(order.id);
@@ -16,6 +22,27 @@ it.skipIf(!enabled)(
       "Live authorized order read: " +
         page.results.length +
         " records; no upstream writes.",
+    );
+  },
+  60000,
+);
+it.skipIf(!enabled)(
+  "validates predefined private fields and public comparable pages without writes",
+  async () => {
+    const page = await readSellerOfferPage("predefined");
+    if (!page.items.length) return;
+    const snapshot = await eldoradoClient().predefinedSnapshot(
+      page.items[0].native_id,
+    );
+    expect(snapshot.id.toLowerCase()).toBe(
+      page.items[0].native_id.toLowerCase(),
+    );
+    expect(typeof snapshot.price).toBe("number");
+    expect(Object.keys(snapshot)).not.toContain("user");
+    const comparison = await comparePredefinedOffers(snapshot.id);
+    expect(Array.isArray(comparison.items)).toBe(true);
+    console.log(
+      "Private predefined and public comparison reads verified; no upstream writes.",
     );
   },
   60000,

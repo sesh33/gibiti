@@ -9,16 +9,20 @@ export { documentedOfferReadEndpoints } from "./definitions";
 export const offerIntegrationStatus = {
   readAdapterReady: true,
   availabilityActions: ["pause", "resume"],
-  otherWrites: false,
+  otherWrites: true,
+  editingSources: ["predefined"],
   liveWriteValidation: "not-performed",
   reason:
-    "Official reads and individual pause/resume actions are implemented. Availability changes require current permissions, explicit confirmation and upstream state verification. No commercial write was used as a setup test.",
+    "Official reads, pause/resume and reviewed predefined creation/details/price/quantity actions are implemented. Reviewed operations require independent approval, explicit execution and MFA. No commercial write was used as a setup test.",
 };
 
-export async function readSellerOfferPage(source: OfferSource) {
+export async function readSellerOfferPage(source: OfferSource, pageIndex = 1) {
   const page = await eldoradoClient().read(
     documentedOfferReadEndpoints[source],
     parseSellerOfferPage,
+    source === "predefined"
+      ? { pageIndex: String(pageIndex), pageSize: "50" }
+      : undefined,
   );
   const syncedAt = new Date().toISOString();
   return {
@@ -36,10 +40,11 @@ export async function synchronizeOfferPage(
   actorId: string,
   sessionId: string,
   source: OfferSource,
+  pageIndex = 1,
 ) {
   const db = supabaseAdmin();
   try {
-    const result = await readSellerOfferPage(source);
+    const result = await readSellerOfferPage(source, pageIndex);
     const { error } = await db.rpc("persist_offer_page", {
       records: result.items,
       source_name: source,
@@ -59,15 +64,13 @@ export async function synchronizeOfferPage(
       ...result.page,
       hasMore: result.hasMore,
       upstreamWrites: false,
-      paginationReady: false,
+      paginationReady: source === "predefined",
     };
   } catch (error) {
-    await db
-      .from("integration_errors")
-      .insert({
-        provider: "eldorado-offers:" + source,
-        code: error instanceof AppError ? error.code : "CONNECTION_FAILED",
-      });
+    await db.from("integration_errors").insert({
+      provider: "eldorado-offers:" + source,
+      code: error instanceof AppError ? error.code : "CONNECTION_FAILED",
+    });
     throw error;
   }
 }

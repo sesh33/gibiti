@@ -28,6 +28,7 @@ export async function GET(
     const { resource } = await params;
     if (resource === "settings") {
       const staff = await requireStaff("settings.manage");
+      const connected = await eldoradoConfigured();
       const { data: errors } = await staff.db
         .from("integration_errors")
         .select("provider,code,created_at")
@@ -52,12 +53,12 @@ export async function GET(
               )
               .map((item) => item.provider.replace("eldorado-offers:", "")) ??
             [],
-          eldorado: eldoradoConfigured(),
+          eldorado: connected,
           messaging: false,
           database: true,
           errors: errors ?? [],
-          liveWrites: false,
-          availabilityActions: eldoradoConfigured(),
+          liveWrites: connected,
+          availabilityActions: connected,
         },
         { headers: { "Cache-Control": "no-store" } },
       );

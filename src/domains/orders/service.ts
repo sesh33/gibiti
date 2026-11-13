@@ -32,10 +32,11 @@ export async function synchronizeOrders(
   actorId: string,
   sessionId: string,
   cursor?: string,
+  direction: "Next" | "Previous" = "Next",
 ) {
   const db = supabaseAdmin();
   try {
-    const page = await eldoradoClient().orders(cursor);
+    const page = await eldoradoClient().orders(cursor, direction);
     const { error } = await db.rpc("persist_order_page", {
       records: page.results.map(normalizeOrder),
       history: page.results.flatMap((order) =>
@@ -58,6 +59,7 @@ export async function synchronizeOrders(
     return {
       count: page.results.length,
       nextCursor: page.nextPageCursor ?? null,
+      previousCursor: page.previousPageCursor ?? null,
       scope: "partial" as const,
     };
   } catch (error) {

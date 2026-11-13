@@ -1,7 +1,17 @@
 import "server-only";
 import { z } from "zod";
 import { AppError } from "@/lib/errors";
+import {
+  resolveSellerCredentials,
+  sellerConnectionStatus,
+  type SellerCredentials,
+} from "./credentials";
 import type { OfferSource } from "@/domains/offers/definitions";
+import {
+  marketplaceChange,
+  predefinedInput,
+  type MarketplaceChange,
+} from "./contracts";
 import {
   currencyOfferSearchBody,
   currencyOffersFetch,
@@ -14,10 +24,14 @@ const origin = "https://www.eldorado.gg";
 const documentedReads = new Set([
   "/api/v1/orders/me/seller/orders",
   "/api/v1/orders/me/seller-api-eligibility",
+  "/api/v1/orders/me/pending-review-order-count",
+  "/api/notifications/me/unread-count",
+  "/api/offerUser/me/restrictions",
   "/api/v1/currency-management/me/offers",
   "/api/v1/item-management/me/offers/me/search",
   "/api/flexibleOffers/me/search",
   "/api/predefinedOffers/me",
+  "/api/predefinedOffers/game",
 ]);
 const tokenSchema = z.object({
   accessToken: z.string().min(1),
@@ -69,13 +83,13 @@ export const upstreamOrder = z.object({
   deliveryTime: z.string().nullable().optional(),
   talkJsConversationId: z.string().nullable().optional(),
   latestDispute: z
-    .object({ reason: z.string().optional(), message: z.string().optional() })
+    .object({ reason: z.string().optional(), message: z.string().nullish() })
     .nullable()
     .optional(),
   cancelation: z
     .object({
       reason: z.string().optional(),
-      message: z.string().optional(),
+      message: z.string().nullish(),
       canceledByUserRole: z.string().optional(),
     })
     .nullable()
@@ -107,10 +121,9 @@ export class EldoradoClient {
   private cooldownUntil = 0;
 
   constructor(
-    private credentials: { clientId: string; clientSecret: string },
+    private credentials: SellerCredentials | (() => Promise<SellerCredentials>),
     private fetcher: typeof fetch = serverFetch,
     private now = Date.now,
-    private pagination?: { cursorParameter: string },
   ) {}
 
   private assertRateLimit() {
@@ -119,6 +132,7 @@ export class EldoradoClient {
         "ELDORADO_RATE_LIMITED",
         `Eldorado rate limit reached. Try again in ${Math.ceil((this.cooldownUntil - this.now()) / 1000)} seconds.`,
         429,
+        Math.ceil((this.cooldownUntil - this.now()) / 1000),
       );
     }
   }
@@ -199,7 +213,11 @@ export class EldoradoClient {
               "Content-Type": "application/json",
               Accept: "application/json",
             },
-            body: JSON.stringify(this.credentials),
+            body: JSON.stringify(
+              typeof this.credentials === "function"
+                ? await this.credentials()
+                : this.credentials,
+            ),
             redirect: "error",
             signal: AbortSignal.timeout(15000),
             cache: "no-store",
@@ -239,7 +257,10 @@ export class EldoradoClient {
     parser: (data: unknown) => T,
     query?: Record<string, string>,
   ): Promise<T> {
-    if (!documentedReads.has(path)) {
+    if (
+      !documentedReads.has(path) &&
+      !/^\/api\/predefinedOffers\/[0-9a-f-]{36}\/private$/i.test(path)
+    ) {
       throw new AppError(
         "UNDOCUMENTED_ENDPOINT",
         "This seller API route is not an enabled documented read endpoint.",
@@ -276,6 +297,7 @@ export class EldoradoClient {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
+          swagger: "Swager request",
           Accept: "application/json",
           ...(currencySearch ? { "Content-Type": "application/json" } : {}),
         },
@@ -357,6 +379,7 @@ export class EldoradoClient {
           method: route.method,
           headers: {
             Authorization: `Bearer ${token}`,
+            swagger: "Swager request",
             Accept: "application/json",
             "Content-Type": "application/json",
           },
@@ -440,6 +463,7 @@ export class EldoradoClient {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
+          swagger: "Swager request",
           Accept: "application/json",
         },
         redirect: "error",
@@ -492,20 +516,216 @@ export class EldoradoClient {
     );
   }
 
-  async orders(cursor?: string): Promise<OrderPage> {
-    const query: Record<string, string> = {};
-    if (cursor) {
-      if (
-        !this.pagination ||
-        !/^[-a-zA-Z0-9_]{1,40}$/.test(this.pagination.cursorParameter)
-      ) {
+  async predefinedSnapshot(nativeId: string) {
+    const id = z.guid().parse(nativeId);
+    return this.read(`/api/predefinedOffers/${id}/private`, (data) => {
+      const { offer } = z
+        .object({
+          offer: z.object({
+            id: z.guid(),
+            offerState: z.string(),
+            pricePerUnit: price,
+            quantity: z.number().nonnegative(),
+            gameId: z.string(),
+            category: z.string(),
+            description: z.string().nullish(),
+            minQuantity: z.number().optional(),
+            volumeDiscounts: z.array(z.json()).optional(),
+            guaranteedDeliveryTime: z.string().optional(),
+            deliveryMethod: z.string().optional(),
+            unitSystem: z.string().optional(),
+            attributes: z.array(z.json()).optional(),
+            tradeEnvironmentValues: z.array(z.json()).optional(),
+            offerAttributeIdValues: z.array(z.json()).optional(),
+          }),
+        })
+        .parse(data);
+      if (offer.id.toLowerCase() !== id.toLowerCase())
         throw new AppError(
-          "PAGINATION_CONTRACT_REQUIRED",
-          "Verify the official cursor query parameter and configure ELDORADO_CURSOR_PARAMETER before requesting subsequent API pages.",
-          503,
+          "UPSTREAM_CONTRACT",
+          "The listing identity did not match.",
+          502,
         );
+      const detail = predefinedInput.shape.details.safeParse({
+        description: offer.description ?? "",
+        guaranteedDeliveryTime: offer.guaranteedDeliveryTime,
+        pricing: {
+          quantity: offer.quantity,
+          minQuantity: offer.minQuantity,
+          volumeDiscounts: offer.volumeDiscounts,
+          pricePerUnit: offer.pricePerUnit,
+        },
+        deliveryMethod: offer.deliveryMethod,
+      });
+      const contextComplete =
+        [
+          offer.attributes,
+          offer.tradeEnvironmentValues,
+          offer.offerAttributeIdValues,
+        ].every(Array.isArray) &&
+        typeof offer.minQuantity === "number" &&
+        !!offer.unitSystem &&
+        !!offer.deliveryMethod;
+      const emptyContext =
+        contextComplete &&
+        [
+          offer.attributes,
+          offer.tradeEnvironmentValues,
+          offer.offerAttributeIdValues,
+        ].every((value) => !value?.length);
+      return {
+        id: offer.id,
+        state: offer.offerState,
+        price: offer.pricePerUnit.amount,
+        currency: offer.pricePerUnit.currency,
+        quantity: offer.quantity,
+        gameId: offer.gameId,
+        category: offer.category,
+        details: detail.success ? detail.data : null,
+        contextComplete,
+        context: {
+          attributes: offer.attributes ?? null,
+          tradeEnvironmentValues: offer.tradeEnvironmentValues ?? null,
+          offerAttributeIdValues: offer.offerAttributeIdValues ?? null,
+          unitSystem: offer.unitSystem ?? null,
+          deliveryMethod: offer.deliveryMethod ?? null,
+          minQuantity: offer.minQuantity ?? null,
+        },
+        document:
+          emptyContext && detail.success
+            ? {
+                details: detail.data,
+                augmentedGame: {
+                  gameId: offer.gameId,
+                  category: offer.category,
+                  tradeEnvironmentId: null,
+                  offerAttributes: [],
+                },
+                giftCardDetails: null,
+              }
+            : null,
+      };
+    });
+  }
+
+  /** Contracts supplied from the authenticated Swagger. No commercial write is retried. */
+  async writeMarketplace(
+    rawChange: MarketplaceChange,
+    nativeId?: string,
+  ): Promise<{
+    acknowledged: true;
+    createdId?: string;
+    order?: { id: string; state: string; deliveryTime: string | null };
+  }> {
+    const change = marketplaceChange.parse(rawChange);
+    const id =
+      change.kind === "offer.create" ? undefined : z.guid().parse(nativeId);
+    const routes = {
+      "offer.price": ["PUT", `/api/predefinedOffersUser/me/${id}/changePrice`],
+      "offer.quantity": [
+        "PUT",
+        `/api/predefinedOffersUser/me/${id}/changeQuantity`,
+      ],
+      "offer.details": ["PUT", `/api/predefinedOffers/${id}/details`],
+      "offer.create": ["POST", "/api/predefinedOffers"],
+      "order.deliver": ["PUT", `/api/v1/orders/me/${id}/deliver`],
+      "order.cancel": ["POST", `/api/v1/orders/me/${id}/cancel`],
+      "order.extend": ["POST", `/api/v1/orders/me/${id}/extend-delivery-time`],
+    } as const;
+    let token: string;
+    try {
+      token = await this.authenticate();
+      this.assertRateLimit();
+    } catch {
+      throw new AppError(
+        "ELDORADO_WRITE_NOT_SENT",
+        "Authentication was unavailable. No marketplace change was sent.",
+        503,
+      );
+    }
+    const [method, path] = routes[change.kind];
+    let response: Response;
+    try {
+      response = await this.request(new URL(path, origin), {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          swagger: "Swager request",
+          Accept: "application/json",
+          ...("body" in change ? { "Content-Type": "application/json" } : {}),
+        },
+        ...("body" in change ? { body: JSON.stringify(change.body) } : {}),
+        redirect: "error",
+        signal: AbortSignal.timeout(20000),
+        cache: "no-store",
+      });
+    } catch {
+      throw new AppError(
+        "ELDORADO_WRITE_UNKNOWN",
+        "The result is uncertain. Check the recorded operation before taking another action.",
+        502,
+      );
+    }
+    if (!response.ok) {
+      const status = response.status;
+      if (status === 401 && this.token === token) {
+        this.token = undefined;
+        this.expiresAt = 0;
       }
-      query[this.pagination.cursorParameter] = cursor;
+      if (status === 429) {
+        try {
+          await this.rejectRateLimit(response);
+        } catch {}
+      } else await this.discard(response);
+      throw new AppError(
+        status >= 400 && status < 500 && status !== 408 && status !== 499
+          ? "ELDORADO_WRITE_REJECTED"
+          : "ELDORADO_WRITE_UNKNOWN",
+        `Eldorado returned HTTP ${status}. No automatic retry was sent.`,
+        502,
+      );
+    }
+    if (change.kind === "order.deliver") {
+      const parsed = upstreamOrder.safeParse(
+        await response.json().catch(() => null),
+      );
+      if (parsed.success && parsed.data.id.toLowerCase() === id!.toLowerCase())
+        return {
+          acknowledged: true,
+          order: {
+            id: parsed.data.id,
+            state: parsed.data.state.state,
+            deliveryTime: parsed.data.deliveryTime ?? null,
+          },
+        };
+    } else if (change.kind === "offer.create") {
+      const raw: unknown = await response.json().catch(() => null);
+      const candidate =
+        typeof raw === "string"
+          ? raw
+          : raw && typeof raw === "object" && "id" in raw
+            ? raw.id
+            : undefined;
+      const created = z.guid().safeParse(candidate);
+      return {
+        acknowledged: true,
+        ...(created.success ? { createdId: created.data } : {}),
+      };
+    } else await this.discard(response);
+    return { acknowledged: true };
+  }
+
+  async orders(
+    cursor?: string,
+    direction: "Next" | "Previous" = "Next",
+  ): Promise<OrderPage> {
+    const query: Record<string, string> = {
+      displayFilter: "DisplaySellingOrders",
+      pageSize: "50",
+    };
+    if (cursor) {
+      query.cursorValue = cursor;
+      query.pageDirection = direction;
     }
     return this.read(
       "/api/v1/orders/me/seller/orders",
@@ -525,28 +745,16 @@ export class EldoradoClient {
   }
 }
 let instance: EldoradoClient | undefined;
-export function eldoradoConfigured() {
-  return Boolean(
-    process.env.ELDORADO_CLIENT_ID && process.env.ELDORADO_CLIENT_SECRET,
-  );
+export async function eldoradoConfigured() {
+  return (await sellerConnectionStatus()).configured;
+}
+export function resetEldoradoClient() {
+  instance = undefined;
 }
 export function eldoradoClient() {
-  if (!eldoradoConfigured()) {
-    throw new AppError(
-      "INTEGRATION_NOT_CONFIGURED",
-      "Configure the Eldorado client credentials in secure environment settings.",
-      503,
-    );
-  }
   return (instance ??= new EldoradoClient(
-    {
-      clientId: process.env.ELDORADO_CLIENT_ID!,
-      clientSecret: process.env.ELDORADO_CLIENT_SECRET!,
-    },
+    resolveSellerCredentials,
     serverFetch,
     Date.now,
-    process.env.ELDORADO_CURSOR_PARAMETER
-      ? { cursorParameter: process.env.ELDORADO_CURSOR_PARAMETER }
-      : undefined,
   ));
 }

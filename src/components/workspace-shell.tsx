@@ -13,6 +13,7 @@ import {
   Gauge,
   Inbox,
   Layers3,
+  MessageSquareText,
   LogOut,
   Search,
   Settings2,
@@ -28,6 +29,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 const navigation = [
+  { label: "Reply library", href: "/templates", icon: MessageSquareText },
   {
     label: "Offers",
     href: "/offers",
@@ -73,7 +75,13 @@ const navigation = [
     permission: "conversations.read",
   },
 ];
-const operationPaths = new Set(["/orders", "/offers", "/inventory", "/overview"]);
+const operationPaths = new Set([
+  "/orders",
+  "/offers",
+  "/inventory",
+  "/overview",
+  "/templates",
+]);
 export function WorkspaceShell({
   children,
   staff,
@@ -112,13 +120,15 @@ export function WorkspaceShell({
       (item.href === "/inventory" &&
         staff.permissions.includes("inventory.manage")),
   );
-  const workspaceNavigation = visible.filter(
-    (item) => operationPaths.has(item.href),
+  const workspaceNavigation = visible.filter((item) =>
+    operationPaths.has(item.href),
   );
   const managementNavigation = visible.filter(
     (item) => !operationPaths.has(item.href) && item.href !== "/inbox",
   );
-  const unavailableNavigation = visible.filter((item) => item.href === "/inbox");
+  const unavailableNavigation = visible.filter(
+    (item) => item.href === "/inbox",
+  );
   const current = navigation.find((item) => pathname.startsWith(item.href));
   const canSearchOrders =
     !staff ||
