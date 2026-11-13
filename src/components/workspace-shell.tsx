@@ -3,8 +3,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { workspaceBrand } from "@/lib/branding";
 import {
   Activity,
+  FileSpreadsheet,
   ArrowUpRight,
   Bell,
   Box,
@@ -29,6 +31,24 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 const navigation = [
+  {
+    label: "Seller center",
+    href: "/seller",
+    icon: Bell,
+    permission: "seller.read",
+  },
+  {
+    label: "Reports & invoices",
+    href: "/reports",
+    icon: FileSpreadsheet,
+    permission: "reports.export",
+  },
+  {
+    label: "Batch workbench",
+    href: "/offers/batch",
+    icon: Layers3,
+    permission: "offers.read",
+  },
   {
     label: "Automation & pricing",
     href: "/automation",
@@ -87,6 +107,9 @@ const operationPaths = new Set([
   "/inventory",
   "/overview",
   "/templates",
+  "/seller",
+  "/reports",
+  "/offers/batch",
 ]);
 export function WorkspaceShell({
   children,
@@ -135,7 +158,11 @@ export function WorkspaceShell({
   const unavailableNavigation = visible.filter(
     (item) => item.href === "/inbox",
   );
-  const current = navigation.find((item) => pathname.startsWith(item.href));
+  const current = [...visible]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find(
+      (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
+    );
   const canSearchOrders =
     !staff ||
     staff.permissions.includes("orders.read") ||
@@ -171,7 +198,8 @@ export function WorkspaceShell({
           <span className="brand-symbol">
             <Zap size={20} fill="currentColor" />
           </span>
-          RIVOX<span className="wordmark-sub">CONTROL</span>
+          {workspaceBrand.name}
+          <span className="wordmark-sub">CONTROL</span>
         </Link>
         <button
           className="workspace-switch"
@@ -179,9 +207,10 @@ export function WorkspaceShell({
           disabled={!canManageSettings}
           onClick={() => router.push("/settings")}
         >
-          <span className="workspace-logo">R</span>
+          <span className="workspace-logo">{workspaceBrand.initial}</span>
           <span>
-            Rivox workspace<small>Private operations</small>
+            {workspaceBrand.organization}
+            <small>Private operations</small>
           </span>
           <ChevronDown size={13} />
         </button>
@@ -191,16 +220,16 @@ export function WorkspaceShell({
             <Link
               key={item.href}
               aria-label={item.label}
-              aria-current={pathname.startsWith(item.href) ? "page" : undefined}
+              aria-current={current?.href === item.href ? "page" : undefined}
               title={item.label}
               className={
-                pathname.startsWith(item.href) ? "nav-link active" : "nav-link"
+                current?.href === item.href ? "nav-link active" : "nav-link"
               }
               href={item.href}
             >
               <item.icon size={17} />
               <span>{item.label}</span>
-              {pathname.startsWith(item.href) && (
+              {current?.href === item.href && (
                 <span className="nav-active-dot" />
               )}
             </Link>
@@ -212,10 +241,10 @@ export function WorkspaceShell({
             <Link
               key={item.href}
               aria-label={item.label}
-              aria-current={pathname.startsWith(item.href) ? "page" : undefined}
+              aria-current={current?.href === item.href ? "page" : undefined}
               title={item.label}
               className={
-                pathname.startsWith(item.href) ? "nav-link active" : "nav-link"
+                current?.href === item.href ? "nav-link active" : "nav-link"
               }
               href={item.href}
             >
@@ -230,10 +259,10 @@ export function WorkspaceShell({
             <Link
               key={item.href}
               aria-label={item.label}
-              aria-current={pathname.startsWith(item.href) ? "page" : undefined}
+              aria-current={current?.href === item.href ? "page" : undefined}
               title="Unavailable: buyer messaging is not included in the Eldorado Seller API."
               className={
-                pathname.startsWith(item.href) ? "nav-link active" : "nav-link"
+                current?.href === item.href ? "nav-link active" : "nav-link"
               }
               href={item.href}
             >
@@ -345,7 +374,7 @@ export function WorkspaceShell({
         <main className="page-content">{children}</main>
         <footer className="workspace-footer">
           <span>
-            <span className="status-dot" /> RIVOX CONTROL{" "}
+            <span className="status-dot" /> {workspaceBrand.name} CONTROL{" "}
             <span className="footer-version">/ v0.1 foundation</span>
           </span>
           <span>Private by design. Precise by default.</span>

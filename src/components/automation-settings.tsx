@@ -5,8 +5,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
-import { money } from "@/lib/utils";
+import { unitPrice } from "@/lib/utils";
 import type { PricingPolicy } from "@/domains/pricing/models";
+import { RepricingMonitor } from "@/components/repricing-monitor";
 type Settings = {
   pollEnabled: boolean;
   pollSeconds: number;
@@ -46,7 +47,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
     queryFn: () => api<State>("/api/automation/settings"),
     enabled: configured,
     retry: false,
-    refetchInterval: 60000,
+    refetchInterval: 15000,
   });
   const policies = useQuery({
     queryKey: ["pricing-policies", "all"],
@@ -54,6 +55,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
     enabled:
       configured && !!me.data?.permissions.includes("offers.update_price"),
     retry: false,
+    refetchInterval: 15000,
   });
   const owner = me.data?.profile.role === "OWNER",
     settings = {
@@ -98,6 +100,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
         title="Automation, on your terms."
         description="Durable floors, preferences and processing history. Simulation first; automatic writes only after explicit authorization."
       />
+      <RepricingMonitor configured={configured} />
       <div className="settings-grid">
         <section className="data-panel settings-section">
           <h2>Workspace background service</h2>
@@ -285,6 +288,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
                 <th>Difference</th>
                 <th>Mode / review</th>
                 <th>Next check</th>
+                <th>Last check / diagnostic</th>
                 <th />
               </tr>
             </thead>
@@ -292,12 +296,20 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
               {policies.data?.items.map((policy) => (
                 <tr key={policy.id}>
                   <td className="mono">{policy.native_id.slice(0, 12)}</td>
-                  <td>{money(Number(policy.floor), policy.currency)}</td>
+                  <td>{unitPrice(Number(policy.floor), policy.currency)}</td>
                   <td>{policy.difference}</td>
                   <td>
                     {policy.mode} / {policy.review_status}
                   </td>
                   <td>{new Date(policy.next_run_at).toLocaleString()}</td>
+                  <td>
+                    {policy.last_checked_at
+                      ? new Date(policy.last_checked_at).toLocaleString()
+                      : "No check recorded"}
+                    <small>
+                      {policy.last_error_code ?? "No recorded pricing error"}
+                    </small>
+                  </td>
                   <td>
                     <Link
                       className="button button-outline button-sm"

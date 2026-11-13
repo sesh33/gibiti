@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
-import { money } from "@/lib/utils";
+import { unitPrice } from "@/lib/utils";
 import type { PricingPolicy, PricingQuote } from "@/domains/pricing/models";
 
 export function PricingControls({
@@ -80,10 +80,10 @@ export function PricingControls({
         body: JSON.stringify({
           offerId,
           floor: Number(floor ?? policy?.floor),
-          difference: Number(difference ?? policy?.difference ?? 0),
-          decimals: decimals ?? policy?.decimals ?? 2,
+          difference: Number(difference ?? policy?.difference ?? 0.00001),
+          decimals: decimals ?? policy?.decimals ?? 5,
           mode: selectedMode,
-          intervalSeconds: interval ?? policy?.interval_seconds ?? 300,
+          intervalSeconds: interval ?? policy?.interval_seconds ?? 15,
           confirmAutomatic: confirmAuto,
         }),
       });
@@ -222,7 +222,7 @@ export function PricingControls({
         <div className="capability-list">
           <div>
             <span>Saved minimum unit price</span>
-            <strong>{money(Number(policy.floor), policy.currency)}</strong>
+            <strong>{unitPrice(Number(policy.floor), policy.currency)}</strong>
           </div>
           <div>
             <span>Saved mode</span>
@@ -258,7 +258,7 @@ export function PricingControls({
                 type="number"
                 step="any"
                 min="0"
-                value={difference ?? String(policy?.difference ?? 0)}
+                value={difference ?? String(policy?.difference ?? 0.00001)}
                 onChange={(event) => setDifference(event.target.value)}
                 disabled={busy}
               />
@@ -269,7 +269,7 @@ export function PricingControls({
                 type="number"
                 min="0"
                 max="8"
-                value={decimals ?? policy?.decimals ?? 2}
+                value={decimals ?? policy?.decimals ?? 5}
                 onChange={(event) => setDecimals(Number(event.target.value))}
                 disabled={busy}
               />
@@ -294,9 +294,9 @@ export function PricingControls({
               Automatic check interval (seconds)
               <input
                 type="number"
-                min="60"
+                min="15"
                 max="86400"
-                value={interval ?? policy?.interval_seconds ?? 300}
+                value={interval ?? policy?.interval_seconds ?? 15}
                 onChange={(event) =>
                   setCheckInterval(Number(event.target.value))
                 }
@@ -380,12 +380,18 @@ export function PricingControls({
         Manual quoted execution checks the market again. No automatic change is
         permitted below the saved floor.
       </p>
+      <p className="scope-note">
+        USD micro-pricing: $0.00001 equals 0.001 cents and needs at least five
+        decimal places. Checks can be configured from 15 seconds; provider
+        latency, workload and Retry-After can lengthen that cadence. A saved
+        floor always takes priority over undercutting.
+      </p>
       {quote && (
         <div>
           <div className="capability-list">
             <div>
               <span>Simulated unit price</span>
-              <strong>{money(Number(quote.amount), quote.currency)}</strong>
+              <strong>{unitPrice(Number(quote.amount), quote.currency)}</strong>
             </div>
             <div>
               <span>Verified equivalent offers</span>
@@ -448,7 +454,7 @@ export function PricingControls({
           {history.data.items.map((item) => (
             <p className="scope-note" key={item.id}>
               {new Date(item.created_at).toLocaleString()} ·{" "}
-              {money(Number(item.amount), item.currency)} · rule{" "}
+              {unitPrice(Number(item.amount), item.currency)} · rule{" "}
               {item.policy_version.slice(0, 8)}
             </p>
           ))}

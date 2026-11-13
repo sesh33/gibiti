@@ -186,6 +186,12 @@ export async function buildPricingQuote(
       pages: totalPages,
       equivalentOffers: candidates.length,
       minimum,
+      position:
+        amount < minimum
+          ? "undercut"
+          : amount === minimum
+            ? "matched"
+            : "floor_limited",
       configuredFloor: Number(policy.floor),
       difference: Number(policy.difference),
       decimals: policy.decimals,

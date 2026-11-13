@@ -15,10 +15,15 @@
 - Hosted automatic pricing needs Owner opt-in, a different MFA policy reviewer and the workspace master switch. Delivery marking needs actual-fulfillment attestation, per-request opt-in, independent approval, fresh Paid state and persistent idempotency. Worker lease/authority is checked before the request; uncertain writes are only reconciled. All automation switches remain off at delivery.
 - English/French reply library for Donut SMP, Roblox, delivery problems and refunds. Required placeholders must be filled before copying; no message is sent.
 - Internal inventory encryption/reservation/reviewed consumption, currency-separated metrics, staff invitation links and default Supabase verified-email Owner activation.
+- Seller center with official eligibility/restriction/count reads and notification pages, permissioned read-state updates, Owner-only account availability commands, durable idempotency and explicit manual recovery.
+- Official sales/orders CSV and invoice PDF downloads with MFA, full-order/export permission, independent throttling, private responses, spreadsheet formula escaping and release only after audit succeeds.
+- Batch previews for up to ten exact predefined offers: price, primitive integer quantity and safely preserved delivery-time details. All review tickets are created atomically; each listing retains its independent review/execution and fresh floor/state checks.
+- Eight-decimal unit-price display, representable micro-undercut validation, 15-second minimum rule intervals, bounded three-pass queue drain and a persisted repricing monitor. Actual cadence depends on request latency, workload and provider backoff. The database scheduler supports a real 15-second schedule.
+- Public per-installation branding and a clean customer source kit generator. Each customer uses a separate Vercel/Supabase project, encryption keys, Owner and Seller credentials. No customer resources were created.
 
 ## External state
 
-The existing Supabase project was restored from INACTIVE on 2026-11-13 and reached ACTIVE_HEALTHY. All 17 forward migrations and their history are applied. The integration credential table and completion RPCs deny anonymous/authenticated access; guarded request/claim functions verify current permissions and sessions.
+The existing Supabase project was restored from INACTIVE on 2026-11-13 and reached ACTIVE_HEALTHY. All 21 forward migrations and their history are applied. The integration credential table and completion RPCs deny anonymous/authenticated access; guarded request/claim functions verify current permissions and sessions.
 
 The authorized Vercel origin is https://rivox-control.vercel.app. Production Supabase bindings and the persistent encryption key are configured. The intended Owner was not guessed or provisioned; activation uses their own verified email/password and MFA. The scoped cloud Eldorado secret was not copied as a placeholder into Vercel: the Owner connects it through Settings.
 
@@ -29,19 +34,19 @@ The Swagger browser session still returned explicit 403. The user supplied the s
 ## Validation
 
 - Full lint and strict TypeScript checks.
-- Unit, SQL and route suite: 293 passed, with 3 live tests skipped by default.
-- Opt-in real read suite: 3 passed, with zero commercial mutations.
+- Unit, SQL and route suite: 326 passed, with 4 live tests skipped by default.
+- Opt-in real read suite: 4 passed, with zero commercial mutations.
 - Browser suite: 11 passed, covering navigation, MFA QR, disconnected messaging, copying replies, the new editor and responsive layouts.
-- Isolated real-component checks cover availability recovery, encrypted connection UI and the reviewed marketplace workflow, using intercepted APIs only. Marketplace checks: 12 passed; availability: 5; connection isolation/cache checks passed.
+- Isolated real-component checks cover availability recovery, encrypted connection UI and the reviewed marketplace workflow, using intercepted APIs only. Marketplace checks: 15 passed; availability: 5; connection isolation/cache checks passed.
 - Production uses the supported Next.js Webpack compiler; types/security checks remain enabled.
 
 ## Limits and remaining human steps
 
-1. The production database still has zero active Owners and zero saved Seller connections. The Owner must activate their verified account/MFA, connect Eldorado in Settings and synchronize. A successful local/cloud read is not a verified private read from Vercel; the hosted origin is recorded only after that server completes the read. Independent review needs a second authorized account; invite a trusted Admin reviewer before testing commercial actions.
+1. The production database now has one active Owner and zero saved Seller connections at the last check. The Owner must connect Eldorado in Settings and synchronize. A successful local/cloud read is not a verified private read from Vercel; the hosted origin is recorded only after that server completes the read. Independent review needs a second authorized account; invite a trusted Admin reviewer before testing commercial actions.
 2. Real commercial actions have not been executed as setup tests. The API has no sandbox. Actual fulfillment must be completed/verified before marking an order delivered.
 3. Creation records HTTP 201 acceptance and refreshes the catalog. Details check observable product/pricing/delivery fields; unknown nested attribute schemas are acknowledged from successful API responses without claiming a full metadata round trip. Extension records HTTP 204 acceptance and rereads the order; it does not invent a verified deadline when deliveryTime is absent.
 4. Gift-card secret imports require a separate encrypted workflow/schema. The editor accepts null/empty giftCardDetails. Unknown game/attribute IDs are never generated. Provider business validations can still reject a valid schema; HTTP rejection messages are sanitized and no write is retried automatically.
-5. Other catalog-family price/details/stock contracts, Swap, boosting workflows, bulk edits and deletion are not enabled. Other source pagination remains limited to verified initial reads.
+5. Other catalog-family price/details/stock contracts, Swap, boosting workflows, provider-wide bulk writes and deletion are not enabled. Selected-target batches use individual documented routes. Other source pagination remains limited to verified initial reads.
 6. The official Seller API excludes chat and has no registered webhooks. Reply templates are manually copied. No Eldorado mailbox/password is shared with staff.
 7. Default Supabase mail is restricted to project-team recipients; first Owner uses their project email. Employee private invitation links avoid SMTP. Free Supabase may pause after inactivity; no paid plan was enabled.
-8. This is a private workspace for one seller account. Multi-tenant organization isolation, independent seller key storage and subscription billing are not implemented.
+8. This is a private workspace for one seller account. The requested commercial model is one isolated installation per customer. Shared-database multitenancy and subscription billing are not implemented or needed for this distribution model.

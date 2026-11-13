@@ -44,6 +44,9 @@ test("all operational modules render with zero invented account data", async ({
     ["/approvals", "A deliberate second look."],
     ["/activity", "Every action leaves a record."],
     ["/automation", "Automation, on your terms."],
+    ["/seller", "A command center for your seller account."],
+    ["/reports", "Your operation, with the numbers."],
+    ["/offers/batch", "More listings. The same control."],
     ["/settings", "Connected carefully. Controlled completely."],
   ]) {
     await page.goto(route);

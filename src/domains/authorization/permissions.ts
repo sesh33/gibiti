@@ -25,6 +25,11 @@ export const permissions = [
   "audit.read",
   "settings.manage",
   "approvals.review_access",
+  "seller.read",
+  "seller.manage",
+  "notifications.read",
+  "notifications.manage",
+  "reports.export",
 ] as const;
 export type Permission = (typeof permissions)[number];
 export const roles = [
@@ -42,7 +47,8 @@ export const rolePermissions: Record<Role, readonly Permission[]> = {
     (p) =>
       p !== "settings.manage" &&
       p !== "team.manage_permissions" &&
-      p !== "inventory.secrets.read",
+      p !== "inventory.secrets.read" &&
+      p !== "seller.manage",
   ),
   SUPERVISOR: [
     "orders.read",

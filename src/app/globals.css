@@ -106,6 +106,32 @@
   --radius: 10px;
   color-scheme: dark;
 }
+.report-card-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-bottom:24px; }
+.report-option { display:grid;gap:14px;background:linear-gradient(145deg,#151c2c,#10131b);border:1px solid var(--border);border-radius:14px;color:var(--foreground);padding:26px;text-align:left;cursor:pointer;transition:border-color .15s,transform .15s; }
+.report-option:hover {transform:translateY(-2px);border-color:var(--primary);}
+.report-option.selected {border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary);}
+.report-option>svg {color:var(--primary);}
+.report-option>strong {font-size:17px;}
+.report-option>span,.report-option>small {color:var(--muted);line-height:1.7;}
+.batch-layout {display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px;align-items:start;}
+.batch-list {max-height:520px;overflow:auto;margin-top:18px;}
+.batch-listing {display:flex;align-items:center;gap:14px;padding:16px 10px;border-bottom:1px solid var(--border);cursor:pointer;}
+.batch-listing input {width:17px;height:17px;accent-color:var(--primary);flex-shrink:0;}
+.batch-listing>span {display:grid;gap:8px;min-width:0;overflow-wrap:anywhere;}
+.batch-listing small {color:var(--muted);}
+.batch-selection {padding-left:20px;max-height:150px;overflow:auto;line-height:1.9;color:var(--muted);}
+.seller-notification {display:grid;gap:12px;padding:22px 0;border-bottom:1px solid var(--border);}
+.seller-notification>div {display:flex;gap:14px;justify-content:space-between;align-items:center;flex-wrap:wrap;}
+.seller-notification>p {white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;color:#b9c3d6;}
+.seller-notification>small {color:var(--muted);}
+.seller-notification>.button {justify-self:start;}
+.repricing-live {background:radial-gradient(ellipse at top right,#163b57 0,transparent 60%),linear-gradient(135deg,#151c2b,#10131b);border:1px solid #2d4260;border-radius:16px;padding:26px;margin-bottom:24px;}
+.repricing-live h2 {font-size:22px;margin:8px 0 12px;}
+.repricing-status-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin:22px 0;}
+.repricing-status-grid strong {display:block;font-size:26px;letter-spacing:-.03em;margin-bottom:8px;}
+.repricing-status-grid span {color:#a6b9cd;font-size:12px;}
+@media(max-width:900px){.report-card-grid{grid-template-columns:1fr;}.batch-layout{grid-template-columns:1fr;}}
+@media(max-width:500px){.repricing-status-grid{grid-template-columns:1fr;}.report-option{padding:20px;}}
 * {
   box-sizing: border-box;
 }

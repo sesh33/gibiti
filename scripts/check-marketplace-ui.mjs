@@ -73,9 +73,101 @@ async function fixture(viewer = false) {
               "offers.update_price",
               "offers.update_stock",
               "offers.create",
+              "seller.read",
+              "seller.manage",
+              "notifications.read",
+              "notifications.manage",
+              "reports.export",
+              "orders.read",
             ],
       });
     if (path === "/api/team") return json({ items: [] });
+    if (path === "/api/seller")
+      return json({
+        checks: [
+          { name: "eligibility", ok: true, value: true },
+          { name: "restrictions", ok: true, value: [] },
+          { name: "unread", ok: true, value: { unread: 1, hasMore: false } },
+          { name: "pendingReviews", ok: true, value: 0 },
+        ],
+        checkedAt: stamp,
+      });
+    if (path === "/api/seller/notifications")
+      return json({
+        items: [
+          {
+            id: "fixture-notification",
+            title: "Synthetic notification",
+            message: "Synthetic provider text",
+            isRead: false,
+            createdAt: stamp,
+          },
+        ],
+        nextCursor: null,
+      });
+    if (path === "/api/seller/actions" && r.method() === "GET")
+      return json({ items: [] });
+    if (path === "/api/seller/actions") {
+      lastRequest = r.postDataJSON();
+      counts.requests++;
+      return json({
+        operation: { status: "acknowledged" },
+        message: "Eldorado accepted the request. No repeated action.",
+      });
+    }
+    if (path === "/api/reports/download") {
+      lastRequest = r.postDataJSON();
+      counts.requests++;
+      return route.fulfill({
+        status: 200,
+        contentType: "text/csv; charset=utf-8",
+        body: "Title,Amount\nSynthetic,1.00",
+      });
+    }
+    if (path === "/api/offers")
+      return json({
+        items: [
+          {
+            id: "predefined:" + id,
+            title: "Synthetic batch listing",
+            state: "Active",
+            price: 2,
+            currency: "USD",
+            quantity: 10,
+          },
+        ],
+        nextCursor: null,
+      });
+    if (path === "/api/offers/batch/preview") {
+      lastRequest = r.postDataJSON();
+      counts.checks++;
+      return json({
+        valid: true,
+        id: requestId,
+        expiresAt: new Date(Date.now() + 300000).toISOString(),
+        items: [
+          {
+            target: "predefined:" + id,
+            title: "Synthetic batch listing",
+            before: { price: 2, currency: "USD", quantity: 10 },
+            change: {
+              kind: "offer.price",
+              body: { amount: lastRequest.change.amount, currency: "USD" },
+            },
+            floor: 1.5,
+          },
+        ],
+        problems: [],
+      });
+    }
+    if (path === `/api/offers/batch/${requestId}/request`) {
+      lastRequest = r.postDataJSON();
+      counts.requests++;
+      return json({
+        ids: [requestId],
+        message: "Requests recorded. No marketplace write was sent.",
+      });
+    }
     if (path === "/api/pricing/policies") {
       if (r.method() === "POST") {
         lastPolicy = r.postDataJSON();
@@ -535,6 +627,92 @@ try {
   await automation.page.close();
   checks.push(
     "workspace opt-in requires explicit consent and its stop switches remain saveable without consent",
+  );
+  const seller = await fixture();
+  await seller.page.goto("http://127.0.0.1:3197/seller");
+  await expect(
+    seller.page.getByText("Synthetic notification", { exact: true }),
+  ).toBeVisible();
+  await seller.page
+    .getByRole("button", { name: "Set offline", exact: true })
+    .click();
+  await seller.page
+    .getByLabel("Reason for this Seller action")
+    .fill("Reviewed the complete seller availability change");
+  await seller.page
+    .getByLabel("I confirm this exact Seller action and its account scope.")
+    .check();
+  await expect(
+    seller.page.getByRole("button", {
+      name: "Confirm Seller action",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await seller.page.getByLabel("Type OFFLINE to confirm").fill("OFFLINE");
+  await seller.page
+    .getByRole("button", { name: "Confirm Seller action", exact: true })
+    .click();
+  await expect.poll(() => seller.counts.requests).toBe(1);
+  assert.deepEqual(seller.request.action, { kind: "seller.offline" });
+  assert.equal(seller.request.confirm, true);
+  assert.equal(seller.counts.executions, 0);
+  assert.deepEqual(seller.errors, []);
+  await seller.page.close();
+  checks.push(
+    "account-wide availability requires a typed target, reason and explicit confirmation",
+  );
+  const report = await fixture();
+  await report.page.goto("http://127.0.0.1:3197/reports");
+  await report.page.getByLabel("Report from date").fill("2026-11-01");
+  await report.page.getByLabel("Report through date").fill("2026-11-13");
+  const downloaded = report.page.waitForEvent("download");
+  await report.page
+    .getByRole("button", { name: "Download official report", exact: true })
+    .click();
+  const download = await downloaded;
+  assert.match(download.suggestedFilename(), /^eldorado-sold-orders-.*\.csv$/);
+  assert.equal(report.request.kind, "sold-orders");
+  assert.equal(report.counts.requests, 1);
+  assert.deepEqual(report.errors, []);
+  await report.page.close();
+  checks.push(
+    "authorized official reports download as files without entering query caches",
+  );
+  const batch = await fixture();
+  await batch.page.goto("http://127.0.0.1:3197/offers/batch");
+  await batch.page.getByRole("checkbox").first().check();
+  await batch.page
+    .getByLabel("New unit price for selected listings")
+    .fill("1.95");
+  await batch.page
+    .getByRole("button", { name: "Preview exact changes" })
+    .click();
+  await expect(
+    batch.page.getByRole("heading", { name: "Exact proposal" }),
+  ).toBeVisible();
+  assert.equal(batch.counts.requests, 0);
+  await batch.page
+    .getByLabel("Reason for this batch")
+    .fill("Reviewed every exact listing and price floor");
+  await expect(
+    batch.page.getByRole("button", {
+      name: "Request independent review for this batch",
+    }),
+  ).toBeDisabled();
+  await batch.page
+    .getByLabel("I verified every listing and value in this exact proposal.")
+    .check();
+  await batch.page
+    .getByRole("button", { name: "Request independent review for this batch" })
+    .click();
+  await expect.poll(() => batch.counts.requests).toBe(1);
+  assert.equal(batch.counts.executions, 0);
+  assert.equal(batch.request.confirm, true);
+  assert.equal("amount" in batch.request, false);
+  assert.deepEqual(batch.errors, []);
+  await batch.page.close();
+  checks.push(
+    "batch preview sends no writes and confirmed review submits only a stored proposal reference",
   );
   console.log(JSON.stringify({ passed: true, checks, externalWrites: 0 }));
 } finally {

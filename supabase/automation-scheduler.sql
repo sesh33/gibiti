@@ -17,6 +17,15 @@ language plpgsql security definer set search_path=public as $$
 declare secret text;origin text;
 begin
  if not exists(select 1 from public.workspace_preferences where id and (poll_enabled or auto_delivery_enabled or auto_pricing_enabled)) then return;end if;
+ if exists(select 1 from public.automation_runtime where id and (backoff_until>now() or leased_until>now())) then return;end if;
+ if not (
+  exists(select 1 from public.workspace_preferences w join public.automation_runtime r on r.id where w.id and w.poll_enabled and (r.last_poll_at is null or r.last_poll_at<now()-make_interval(secs=>w.poll_seconds)))
+  or exists(select 1 from public.repricing_policies p where p.next_run_at<=now() and public.automatic_policy_authorized(p.id,p.version))
+  or exists(select 1 from public.approval_requests a join public.workspace_preferences w on w.id where a.status in ('approved','executing','blocked') and
+    (a.status='approved' or nullif(a.result->>'automationNextCheckAt','')::timestamptz is null or (a.result->>'automationNextCheckAt')::timestamptz<=now()) and
+    ((w.auto_delivery_enabled and a.automatic_delivery_requested and a.fulfillment_confirmed_at is not null) or
+     (w.auto_pricing_enabled and a.payload->>'automaticPolicyId' is not null)))
+ ) then return;end if;
  select worker_origin into origin from public.automation_runtime where id and scheduler_configured;
  if origin is null or origin !~ '^https://[A-Za-z0-9.-]+$' then return;end if;
  select decrypted_secret into secret from vault.decrypted_secrets where name='rivox_worker_bearer';
@@ -28,8 +37,6 @@ begin
   update public.automation_runtime set last_error_code='SCHEDULER_HTTP_FAILED' where id;
 end $$;
 revoke all on function public.dispatch_rivox_worker() from public,anon,authenticated;
-do $$begin
- if not exists(select 1 from cron.job where jobname='rivox-hosted-worker') then
-  perform cron.schedule('rivox-hosted-worker','* * * * *','select public.dispatch_rivox_worker();');
- end if;
-end $$;
+-- pg_cron 1.6+ supports seconds schedules. Reusing the name updates the job;
+-- it does not create parallel duplicate workers on redeployment.
+select cron.schedule('rivox-hosted-worker','15 seconds','select public.dispatch_rivox_worker();');

@@ -22,7 +22,7 @@ to use the published product.
    authorized participant confirms execution. Use Check outcome for an uncertain
    result. Never submit another change to try to recover an uncertain write.
 
-The deployed project still needs its intended Owner and saved Seller connection.
+The intended Owner is activated. The deployed project still needs its saved Seller connection.
 The published sign-in form and anonymous access controls can be verified without
 creating that identity. Successful official cloud reads are separate evidence;
 they do not prove private reads from the Vercel application before connection.
@@ -39,7 +39,7 @@ price, difference below an equivalent competitor, decimal precision and mode.
   amount. Independent approval and a fresh market/own-listing check follow.
 - **Automatic** requires explicit per-offer consent, a different eligible MFA
   reviewer for that exact rule version, and the Owner's automatic-pricing master
-  switch on the Automation page. Changing the rule resets its review. No price
+  switch on the Automation page. Checks support a minimum interval of 15 seconds; actual cadence depends on provider latency, backlog and cooldowns. Up to three due items are processed serially per worker invocation. Changing the rule resets its review. No price
   below its saved floor or in a different currency is accepted, including through
   the ordinary manual price and full-details routes.
 
@@ -77,12 +77,12 @@ read contract omits the corresponding field.
 
 ## Hosted scheduler
 
-The operator applies migrations through `202611130019_production_verification.sql`,
+The operator applies migrations through `202611130023_tool_rate_buckets.sql`,
 then runs `scripts/configure-hosted-automation.py` with the Vercel project/team,
 Supabase project ref and exact HTTPS origin. It uses provider administration
 tokens only in the operator environment. It generates/reuses a separate worker
 key in Supabase Vault and encrypted Vercel `CRON_SECRET`, installs pg_cron and the
-HTTP extension, and schedules a private dispatcher every minute. Worker secrets
+HTTP extension, and schedules a private dispatcher every 15 seconds. Worker secrets
 are not persisted in a shared HTTP request queue or cron command text. Vault and
 the dispatcher deny staff/anonymous access. Ordinary redeployment preserves the
 worker and inventory encryption keys.
@@ -119,3 +119,22 @@ flow; the app does not switch to main-account passwords/cookies or bypass an
 OAuth redirect allowlist. No Cognito redirect is used by client credentials.
 Any actual production rejection or vendor bot-authorization requirement must be
 resolved with Eldorado; none is inferred from an untested Vercel connection.
+
+## Added Seller tools
+
+The Seller center reads eligibility, restrictions, unread counts and notification
+pages. Owner-only online/offline and permitted notification-read updates use
+bodyless official commands, explicit confirmations and durable one-time claims.
+HTTP acceptance is not represented as independently verified online status.
+Uncertain actions remain locked until the Owner records an actual manual check
+on Eldorado; this check sends no upstream mutation.
+
+Reports use official sold-order-data/order-data CSV and invoice/generate PDF
+endpoints with inclusive UTC dates. MFA, reports.export and full orders.read are
+required. Downloads are limited to 10 MiB and 367 inclusive calendar days, escape
+spreadsheet formulas in text cells and are released only after audit succeeds.
+
+Selected-target batch editing prepares up to ten price, quantity or guaranteed
+delivery changes from actual current values. Unknown details, changed currency
+or violated floors block the preview. Ticket creation is atomic, while actual
+marketplace requests remain independently reviewed/executed per listing.

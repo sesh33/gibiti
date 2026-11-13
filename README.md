@@ -8,11 +8,11 @@ Authorized employees synchronize listings, inspect state/price/quantity and expl
 
 The Catalog operator preset grants listing reads, pause/resume and assigned-order context. Saving a profile does not assign it: access changes still require an independent reviewer. Full details replacement requires create, price and stock permissions together. Predefined API pages and sold-order cursors are supported. New-order polling is opt-in, read-only, configurable and backs off on errors/429. Browser preferences and workspace settings persist in PostgreSQL.
 
-Predefined listing creation, details replacement, individual price/quantity changes and eligible order delivery/cancellation/deadline extension/correction use the user-supplied official Swagger contracts. A staff request is independently approved, then an authorized participant confirms execution with MFA. Order delivery means marking an already completed transfer as delivered; it does not transfer in-game goods. Per-offer floors and complete-market simulations are available. Manual quoted prices need confirmation and independent review; automatic repricing needs an explicitly requested rule, a different MFA reviewer and the Owner workspace switch. Automatic delivery marking is off by default and only processes fulfilled, independently approved opt-in requests. Deletion, bulk operations and chat sending are not enabled. Messaging is excluded from the official Seller API.
+Predefined listing creation, details replacement, individual price/quantity changes and eligible order delivery/cancellation/deadline extension/correction use the user-supplied official Swagger contracts. A staff request is independently approved, then an authorized participant confirms execution with MFA. Order delivery means marking an already completed transfer as delivered; it does not transfer in-game goods. Per-offer floors and complete-market simulations are available. Manual quoted prices need confirmation and independent review; automatic repricing needs an explicitly requested rule, a different MFA reviewer and the Owner workspace switch. Automatic delivery marking is off by default and only processes fulfilled, independently approved opt-in requests. Selected-target batches prepare price, quantity and delivery-time changes for independent review. Provider-wide bulk writes, deletion and chat sending are not enabled. Messaging is excluded from the official Seller API.
 
 ## Hosting and access
 
-The authorized Vercel project is live at [rivox-control.vercel.app](https://rivox-control.vercel.app). HTTPS/access-control smoke checks passed; the intended Owner must still claim their own verified access. Hosted Supabase has 17 application migrations, RLS, explicit private RPC grants and migration history.
+The authorized Vercel project is live at [rivox-control.vercel.app](https://rivox-control.vercel.app). HTTPS/access-control smoke checks passed; the intended Owner must still claim their own verified access. Hosted Supabase has 21 application migrations, RLS, explicit private RPC grants and migration history.
 
 Private first-Owner setup requires an expiring capability, verified email, the user's own password and MFA. No default credentials exist. Owner setup supports the standard Supabase confirmation email link; employee invitations can use private links without SMTP.
 
@@ -20,9 +20,11 @@ After MFA, the Owner connects Eldorado in Settings using the existing Seller API
 
 The hosted background scheduler uses Supabase pg_cron, a private dispatcher and encrypted Vault/Vercel worker authentication. No local process, extension or Eldorado browser cookie is required. Every automation starts disabled, and activation requires a Seller read verified from the production origin. See [hosted operations](docs/hosted-operations.md).
 
+The Seller center adds official notification pages/read-state actions, restrictions/eligibility and Owner-only online/offline commands. Reports download official sales/orders CSV and PDF invoices with MFA, audit and spreadsheet-safe escaping. The repricing engine supports micro-undercuts up to eight decimal places and a 15-second minimum interval, subject to provider latency, backlog and Retry-After.
+
 The reply library provides English/French team messages for Donut SMP, Robux and general support. Required order details must be filled before copying. It does not send messages. The Owner can also check official notification, pending-review and restriction counts without changing their marketplace state.
 
-This is currently a private workspace for one seller account. Organization isolation, subscription billing and onboarding independent seller tenants are not implemented; it must not be sold as a multi-tenant SaaS yet.
+The commercial distribution model is a dedicated installation per customer: a separate Vercel site, Supabase project, Owner, encryption keys and Seller credentials. Public branding is configured per installation; the UI remains English. `scripts/package-client.py` builds a clean customer kit without data or secrets. This is not a shared-database multi-tenant service. See [customer installations](docs/customer-installations.md).
 
 ## Verified behavior
 

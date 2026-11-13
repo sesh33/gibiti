@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api-client";
-import { money } from "@/lib/utils";
+import { unitPrice } from "@/lib/utils";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { PredefinedFields } from "@/components/predefined-fields";
@@ -199,7 +199,7 @@ export function OfferEditor({ configured }: { configured: boolean }) {
               <div>
                 <span>Current unit price</span>
                 <strong>
-                  {money(
+                  {unitPrice(
                     source.data.snapshot.price,
                     source.data.snapshot.currency,
                   )}
@@ -417,7 +417,7 @@ export function OfferEditor({ configured }: { configured: boolean }) {
                     <tbody>
                       {comparison.data.items.map((row) => (
                         <tr key={row.id}>
-                          <td>{money(row.price, row.currency)}</td>
+                          <td>{unitPrice(row.price, row.currency)}</td>
                           <td>{row.quantity}</td>
                           <td>{row.unit}</td>
                         </tr>

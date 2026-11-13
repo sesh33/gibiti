@@ -49,11 +49,11 @@ try:
         os.environ['VERCEL_TOKEN'], [{'key': 'CRON_SECRET', 'value': worker_key, 'type': 'encrypted', 'target': ['production']}], 'POST')
     source = pathlib.Path(__file__).resolve().parent.parent / 'supabase/automation-scheduler.sql'
     query(source.read_text())
-    facts = query("select (select count(*) from cron.job where jobname='rivox-hosted-worker' and active) as active_jobs,has_function_privilege('authenticated','public.dispatch_rivox_worker()','EXECUTE') as staff_dispatch,has_function_privilege('anon','public.dispatch_rivox_worker()','EXECUTE') as anon_dispatch,has_table_privilege('authenticated','vault.decrypted_secrets','SELECT') as staff_vault_read;")[0]
-    if facts['active_jobs'] != 1 or facts['staff_dispatch'] or facts['anon_dispatch'] or facts['staff_vault_read']:
+    facts = query("select (select count(*) from cron.job where jobname='rivox-hosted-worker' and active) as active_jobs,(select schedule from cron.job where jobname='rivox-hosted-worker') as schedule,has_function_privilege('authenticated','public.dispatch_rivox_worker()','EXECUTE') as staff_dispatch,has_function_privilege('anon','public.dispatch_rivox_worker()','EXECUTE') as anon_dispatch,has_table_privilege('authenticated','vault.decrypted_secrets','SELECT') as staff_vault_read;")[0]
+    if facts['active_jobs'] != 1 or facts['schedule'] != '15 seconds' or facts['staff_dispatch'] or facts['anon_dispatch'] or facts['staff_vault_read']:
         raise RuntimeError('Scheduler permission verification failed')
     query('update public.automation_runtime set worker_origin=' + sql_literal(args.origin) + ',scheduler_configured=true where id;')
-    result = {'schedulerConfigured': True, 'cronJobs': facts['active_jobs'], 'secretInOutput': False, 'automationEnabledBySetup': False}
+    result = {'schedulerConfigured': True, 'cronJobs': facts['active_jobs'], 'schedule': facts['schedule'], 'secretInOutput': False, 'automationEnabledBySetup': False}
     if args.check_production:
         response = api(args.origin + '/api/automation/worker', worker_key, {'mode': 'diagnostic'}, 'POST')
         if response.get('mode') != 'diagnostic' or response.get('upstreamWrites') != 0 or response.get('origin') != args.origin:

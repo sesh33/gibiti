@@ -7,6 +7,7 @@ import { ArrowRight, LockKeyhole, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { normalizeMfaQrCode } from "@/domains/authentication/mfa-qr";
+import { workspaceBrand } from "@/lib/branding";
 export function AuthForm({
   mode,
   configured = true,
@@ -83,7 +84,8 @@ export function AuthForm({
           <span className="brand-symbol">
             <Zap size={20} fill="currentColor" />
           </span>
-          RIVOX<span className="wordmark-sub">CONTROL</span>
+          {workspaceBrand.name}
+          <span className="wordmark-sub">CONTROL</span>
         </Link>
         <div className="auth-manifesto">
           <span className="eyebrow">SELLER OPERATIONS, REIMAGINED</span>
@@ -99,7 +101,7 @@ export function AuthForm({
           </div>
         </div>
         <span className="auth-footnote">
-          RIVOX CONTROL · PRIVATE OPERATIONS
+          {workspaceBrand.name} CONTROL · PRIVATE OPERATIONS
         </span>
       </div>
       <section className="auth-panel">

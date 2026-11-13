@@ -7,10 +7,16 @@ export const policyInput = z
     difference: z.number().finite().nonnegative(),
     decimals: z.number().int().min(0).max(8),
     mode: z.enum(["simulation", "manual", "automatic"]).default("simulation"),
-    intervalSeconds: z.number().int().min(60).max(86400).default(300),
+    intervalSeconds: z.number().int().min(15).max(86400).default(15),
     confirmAutomatic: z.boolean().default(false),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      input.difference === 0 ||
+      input.difference * 10 ** input.decimals >= 1 - 1e-10,
+    "The decimal precision must represent the configured difference.",
+  );
 export type PricingPolicy = {
   id: string;
   offer_id: string;

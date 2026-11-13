@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState, QueryError } from "@/components/empty-state";
 import { api } from "@/lib/api-client";
-import { money } from "@/lib/utils";
+import { unitPrice } from "@/lib/utils";
 import {
   offerSources,
   sourceLabels,
@@ -646,7 +646,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                         </td>
                         <td>
                           {offer.price !== null && offer.currency
-                            ? money(Number(offer.price), offer.currency)
+                            ? unitPrice(Number(offer.price), offer.currency)
                             : "Not provided"}
                         </td>
                         <td>{offer.quantity ?? "Not provided"}</td>
@@ -804,7 +804,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                 <span>Unit price / quantity</span>
                 <b>
                   {selected.price !== null && selected.currency
-                    ? money(Number(selected.price), selected.currency)
+                    ? unitPrice(Number(selected.price), selected.currency)
                     : "Not provided"}{" "}
                   / {selected.quantity ?? "Not provided"}
                 </b>

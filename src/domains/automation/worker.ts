@@ -244,7 +244,7 @@ async function executeAutomaticTicket(id: string, plan: Plan) {
       .in("status", ["executing", "blocked"]);
   return result;
 }
-export async function runHostedWorker() {
+async function runHostedPass() {
   const admin = supabaseAdmin(),
     started = Date.now();
   const { data: raw, error } = await admin.rpc("claim_automation_tick");
@@ -261,6 +261,14 @@ export async function runHostedWorker() {
       upstreamWrites: 0,
     };
   const plan = raw as Plan;
+  if (!plan.pollDue && !plan.operationId && !plan.policy) {
+    await admin.rpc("release_automation_tick", {
+      lease: plan.lease,
+      failure_code: null,
+      retry_seconds: 60,
+    });
+    return { mode: "skipped", reason: "nothing_due", upstreamWrites: 0 };
+  }
   let failure: string | null = null,
     retry = 60;
   const results: Record<string, unknown> = {};
@@ -346,4 +354,17 @@ export async function runHostedWorker() {
     if (releaseError)
       console.error(JSON.stringify({ event: "worker_release_pending" }));
   }
+}
+
+/** A bounded queue drain improves multi-listing throughput without concurrent
+ * claims or repeated writes. Each pass reacquires current database authority. */
+export async function runHostedWorker() {
+  const started = Date.now(),
+    passes: Awaited<ReturnType<typeof runHostedPass>>[] = [];
+  for (let count = 0; count < 3 && Date.now() - started < 25000; count++) {
+    const result = await runHostedPass();
+    passes.push(result);
+    if (result.mode === "skipped") break;
+  }
+  return passes.length === 1 ? passes[0] : { mode: "run", passes };
 }

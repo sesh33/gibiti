@@ -1,6 +1,11 @@
 import "server-only";
 import { z } from "zod";
 import { AppError } from "@/lib/errors";
+import {
+  sellerAction,
+  reportRequest,
+  type SellerAction,
+} from "./seller-contracts";
 import { eldoradoRateStore, type ProviderRateStore } from "./rate-store";
 import {
   resolveSellerCredentials,
@@ -27,6 +32,10 @@ const documentedReads = new Set([
   "/api/v1/orders/me/seller-api-eligibility",
   "/api/v1/orders/me/pending-review-order-count",
   "/api/notifications/me/unread-count",
+  "/api/notifications/me",
+  "/api/v1/orders/me/sold-order-data",
+  "/api/v1/orders/me/order-data",
+  "/api/v1/orders/me/invoice/generate",
   "/api/offerUser/me/restrictions",
   "/api/v1/currency-management/me/offers",
   "/api/v1/item-management/me/offers/me/search",
@@ -256,11 +265,10 @@ export class EldoradoClient {
   }
 
   /** Read only an explicitly documented seller route; tokens never leave this class. */
-  async read<T>(
+  private async readResponse(
     path: string,
-    parser: (data: unknown) => T,
     query?: Record<string, string>,
-  ): Promise<T> {
+  ): Promise<Response> {
     if (
       !documentedReads.has(path) &&
       !/^\/api\/predefinedOffers\/[0-9a-f-]{36}\/private$/i.test(path)
@@ -328,23 +336,167 @@ export class EldoradoClient {
           502,
         );
       }
-      const data = await this.json(response);
-      try {
-        return parser(data);
-      } catch (error) {
-        if (error instanceof AppError) throw error;
-        throw new AppError(
-          "UPSTREAM_CONTRACT",
-          "The seller API response does not match the verified contract.",
-          502,
-        );
-      }
+      return response;
     }
     throw new AppError(
       "ELDORADO_AUTH_FAILED",
       "Eldorado rejected the refreshed token.",
       502,
     );
+  }
+
+  async read<T>(
+    path: string,
+    parser: (data: unknown) => T,
+    query?: Record<string, string>,
+  ): Promise<T> {
+    const data = await this.json(await this.readResponse(path, query));
+    try {
+      return parser(data);
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      throw new AppError(
+        "UPSTREAM_CONTRACT",
+        "The seller API response does not match the verified contract.",
+        502,
+      );
+    }
+  }
+
+  async downloadReport(raw: unknown) {
+    const input = reportRequest.parse(raw);
+    const path = {
+      "sold-orders": "/api/v1/orders/me/sold-order-data",
+      orders: "/api/v1/orders/me/order-data",
+      invoice: "/api/v1/orders/me/invoice/generate",
+    }[input.kind];
+    const response = await this.readResponse(path, {
+      fromDate: input.from + "T00:00:00.000Z",
+      untilDate: input.until + "T23:59:59.999Z",
+    });
+    const contentType =
+      response.headers.get("content-type")?.split(";")[0].toLowerCase() ?? "";
+    const reader = response.body?.getReader();
+    if (!reader)
+      throw new AppError(
+        "EMPTY_REPORT",
+        "Eldorado returned an empty report.",
+        502,
+      );
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+    try {
+      while (true) {
+        const next = await reader.read();
+        if (next.done) break;
+        length += next.value.byteLength;
+        if (length > 10 * 1024 * 1024)
+          throw new AppError(
+            "REPORT_TOO_LARGE",
+            "This report exceeds the 10 MiB application download budget. Select a shorter date range.",
+            413,
+          );
+        chunks.push(next.value);
+      }
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+    const bytes = Buffer.concat(chunks);
+    if (!bytes.length)
+      throw new AppError(
+        "EMPTY_REPORT",
+        "No report content was returned for this period.",
+        404,
+      );
+    if (["application/csv", "text/csv"].includes(contentType))
+      return { bytes, type: "csv" as const };
+    if (
+      input.kind === "invoice" &&
+      contentType === "application/pdf" &&
+      bytes.subarray(0, 5).toString() === "%PDF-"
+    )
+      return { bytes, type: "pdf" as const };
+    throw new AppError(
+      "REPORT_FORMAT_UNVERIFIED",
+      "The provider returned an unverified report format. No file was downloaded.",
+      502,
+    );
+  }
+
+  /** Explicit account/notification action. A timeout is never retried. */
+  async writeSellerAction(raw: SellerAction, beforeSend?: () => Promise<void>) {
+    const action = sellerAction.parse(raw);
+    const path =
+      action.kind === "seller.online"
+        ? "/api/offerUser/me/switchOnline"
+        : action.kind === "seller.offline"
+          ? "/api/offerUser/me/switchOffline"
+          : action.kind === "notification.read"
+            ? `/api/notifications/me/${action.notificationId}/markAsRead`
+            : "/api/notifications/me/markAllAsRead";
+    let token: string;
+    try {
+      token = await this.authenticate();
+    } catch (error) {
+      throw new AppError(
+        "ELDORADO_WRITE_NOT_SENT",
+        "Authentication is unavailable. No Seller action was sent.",
+        error instanceof AppError ? error.status : 503,
+        error instanceof AppError ? error.retryAfter : undefined,
+      );
+    }
+    let response: Response;
+    if (beforeSend) await beforeSend();
+    try {
+      response = await this.request(new URL(path, origin), {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          swagger: "Swager request",
+          Accept: "application/json",
+        },
+        redirect: "error",
+        cache: "no-store",
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        ["ELDORADO_RATE_LIMITED", "RATE_GATE_UNAVAILABLE"].includes(error.code)
+      )
+        throw new AppError(
+          "ELDORADO_WRITE_NOT_SENT",
+          error.message,
+          error.status,
+          error.retryAfter,
+        );
+      throw new AppError(
+        "ELDORADO_WRITE_UNKNOWN",
+        "The Seller action outcome is uncertain. It was not retried.",
+        502,
+      );
+    }
+    if (response.status === 429) {
+      try {
+        await this.rejectRateLimit(response);
+      } catch {}
+    } else await this.discard(response);
+    if (!response.ok) {
+      if (response.status === 401 && this.token === token) {
+        this.token = undefined;
+        this.expiresAt = 0;
+      }
+      throw new AppError(
+        response.status >= 400 &&
+          response.status < 500 &&
+          ![408, 499].includes(response.status)
+          ? "ELDORADO_WRITE_REJECTED"
+          : "ELDORADO_WRITE_UNKNOWN",
+        `Eldorado returned HTTP ${response.status}. No automatic retry was sent.`,
+        502,
+      );
+    }
+    return { acknowledged: true as const };
   }
 
   /** One explicitly confirmed listing action. Never retries a commercial write. */

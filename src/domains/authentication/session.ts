@@ -6,7 +6,10 @@ import {
   type Permission,
   type Role,
 } from "@/domains/authorization/permissions";
-export async function requireStaff(permission?: Permission) {
+export async function requireStaff(
+  permission?: Permission,
+  requireMfa = false,
+) {
   const db = await supabaseServer();
   const {
     data: { user },
@@ -39,7 +42,7 @@ export async function requireStaff(permission?: Permission) {
   if (aalError)
     throw new AppError("SESSION_INVALID", "Session verification failed.", 401);
   if (
-    (profile.role === "OWNER" || profile.role === "ADMIN") &&
+    (requireMfa || profile.role === "OWNER" || profile.role === "ADMIN") &&
     assurance?.currentLevel !== "aal2"
   )
     throw new AppError(

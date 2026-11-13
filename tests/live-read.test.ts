@@ -3,7 +3,29 @@ import { eldoradoClient } from "@/domains/eldorado/client";
 import { normalizeOrder } from "@/domains/orders/service";
 import { readSellerOfferPage } from "@/domains/offers/service";
 import { comparePredefinedOffers } from "@/domains/offers/comparison";
+import {
+  readNotifications,
+  readSellerOverview,
+} from "@/domains/eldorado/seller-tools";
 const enabled = process.env.RIVOX_LIVE_READS === "true";
+it.skipIf(!enabled)(
+  "verifies official Seller diagnostics, notifications, CSV reports and PDF invoice without commercial writes",
+  async () => {
+    const client = eldoradoClient(),
+      notifications = await readNotifications(undefined, client),
+      overview = await readSellerOverview(client);
+    expect(Array.isArray(notifications.items)).toBe(true);
+    expect(overview.checks.every((check) => check.ok)).toBe(true);
+    const until = new Date().toISOString().slice(0, 10),
+      from = until.slice(0, 7) + "-01";
+    for (const kind of ["orders", "sold-orders", "invoice"] as const) {
+      const report = await client.downloadReport({ kind, from, until });
+      expect(report.type).toBe(kind === "invoice" ? "pdf" : "csv");
+      expect(report.bytes.byteLength > 0).toBe(true);
+    }
+  },
+  60000,
+);
 it.skipIf(!enabled)(
   "validates authorized real order reads and normalization without upstream mutations",
   async () => {
