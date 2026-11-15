@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AuthForm } from "@/components/auth-forms";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 type Invitation =
   | { kind: "hash"; tokenHash: string }
   | { kind: "session"; accessToken: string; refreshToken: string };
@@ -78,7 +79,10 @@ export function InviteSession() {
   }
   if (status === "ready") return <AuthForm mode="password" />;
   return (
-    <main className="standalone">
+    <main className="standalone invitation-card">
+      <span className="invitation-emblem">
+        <ShieldCheck size={26} />
+      </span>
       <span className="eyebrow">RIVOX CONTROL / STAFF INVITATION</span>
       <h1>
         {status === "loading"
@@ -91,6 +95,7 @@ export function InviteSession() {
       {status === "pending" && (
         <Button onClick={accept} disabled={busy}>
           {busy ? "Verifying invitation…" : "Accept invitation"}
+          <ArrowRight size={15} />
         </Button>
       )}
       {error && (
@@ -98,6 +103,13 @@ export function InviteSession() {
           {error}
         </p>
       )}
+      <div className="invitation-note">
+        <ShieldCheck size={15} />
+        <span>
+          Your individual access starts here. Workspace permissions remain
+          controlled by your team.
+        </span>
+      </div>
     </main>
   );
 }

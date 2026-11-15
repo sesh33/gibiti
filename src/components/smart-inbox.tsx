@@ -252,7 +252,7 @@ export function SmartInbox({ configured }: { configured: boolean }) {
     });
   }
   return (
-    <>
+    <div className="ops-workspace inbox-workspace">
       <PageHeading
         eyebrow="CUSTOMER EXPERIENCE"
         title="Smart inbox"
@@ -266,6 +266,12 @@ export function SmartInbox({ configured }: { configured: boolean }) {
               ? "Official messaging connected"
               : "Awaiting official messaging access"}
         </span>
+        <Button variant="ghost" asChild>
+          <Link href="/templates">
+            <FileText size={14} />
+            Open reply library
+          </Link>
+        </Button>
         {canManageSettings && (
           <Button variant="outline" asChild>
             <Link href="/settings">
@@ -796,7 +802,7 @@ export function SmartInbox({ configured }: { configured: boolean }) {
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
 function SettingsIcon() {

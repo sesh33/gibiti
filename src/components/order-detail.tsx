@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   FileText,
+  PackageCheck,
+  History,
   ShieldCheck,
   UserRound,
   XCircle,
@@ -172,7 +174,7 @@ export function OrderDetail({
     setRequestKey(crypto.randomUUID());
   }
   return (
-    <>
+    <div className="ops-workspace order-detail-workspace">
       <Link className="back-link" href="/orders">
         <ArrowLeft size={13} />
         Order center
@@ -218,7 +220,10 @@ export function OrderDetail({
               ))}
             </div>
             <div className="detail-section">
-              <h3>Product & delivery</h3>
+              <h3>
+                <PackageCheck size={15} />
+                Product & delivery
+              </h3>
               <p className="preserve-lines">
                 {order.details.description ??
                   "No product description was provided."}
@@ -244,7 +249,10 @@ export function OrderDetail({
               </div>
             )}
             <div className="detail-section">
-              <h3>State history</h3>
+              <h3>
+                <History size={15} />
+                State history
+              </h3>
               <div className="timeline">
                 {[...order.order_state_history]
                   .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))
@@ -512,6 +520,6 @@ export function OrderDetail({
           </Button>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

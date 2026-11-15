@@ -436,7 +436,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
       ["running", "unknown"].includes(operation.status),
     );
   return (
-    <>
+    <div className="commerce-page commerce-offers">
       <PageHeading
         eyebrow="LISTING OPERATIONS"
         title="Offers, without the clutter."
@@ -1183,6 +1183,6 @@ export function OffersCenter({ configured }: { configured: boolean }) {
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

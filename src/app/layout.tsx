@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./visual-refresh.css";
+import "./commerce-refresh.css";
+import "./operations-refresh.css";
+import "./settings-refresh.css";
+import "./overview-auth-refresh.css";
 import { Providers } from "./providers";
 import { workspaceBrand } from "@/lib/branding";
 export const metadata: Metadata = {

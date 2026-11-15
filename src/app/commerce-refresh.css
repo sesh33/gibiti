@@ -1,0 +1,664 @@
+/* Commerce workspaces share the RIVOX shell; local surfaces clarify each task. */
+.commerce-page {
+  min-width: 0;
+}
+.commerce-workflow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  list-style: none;
+  margin: 0 0 26px;
+  padding: 0;
+  border: 1px solid var(--border, #243246);
+  border-radius: 15px;
+  overflow: hidden;
+  background: linear-gradient(
+    115deg,
+    #131f32 0%,
+    var(--surface-1, #101722) 72%
+  );
+}
+.commerce-workflow > li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 19px 21px;
+}
+.commerce-workflow > li + li {
+  border-left: 1px solid var(--border, #243246);
+}
+.commerce-step-number {
+  display: grid;
+  place-items: center;
+  width: 33px;
+  height: 33px;
+  flex: 0 0 auto;
+  border: 1px solid #648dff36;
+  border-radius: 10px;
+  color: #adc2ff;
+  background: #5378ff12;
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.commerce-workflow li > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.commerce-workflow strong {
+  color: #e3edff;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.1px;
+}
+.commerce-workflow li > div > span {
+  color: var(--text-secondary, #94a3b8);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.commerce-workflow li > svg {
+  color: #526787;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.commerce-page > .info-banner {
+  margin-bottom: 22px;
+  border-radius: 12px;
+  padding: 16px 19px;
+  background: #5378ff09;
+  border-color: #5d82e92b;
+  color: #adbeda;
+  font-size: 12px;
+  line-height: 1.85;
+}
+.commerce-page > .info-banner > svg {
+  color: #88aaff;
+  margin-top: 3px;
+}
+.commerce-page .settings-section > h2,
+.commerce-page .panel-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e9f1ff;
+  letter-spacing: -0.35px;
+  font-size: 17px;
+  font-weight: 650;
+}
+.commerce-section-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 17px;
+}
+.commerce-section-title h2 {
+  color: #e9f1ff;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+  margin: 5px 0 0;
+}
+.commerce-section-icon {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  flex: 0 0 auto;
+  color: #9eb9ff;
+  background: linear-gradient(150deg, #5378ff22, #5378ff09);
+  border: 1px solid #648dff2d;
+  border-radius: 13px;
+}
+.commerce-overline {
+  color: #829bbf;
+  letter-spacing: 1.4px;
+  font-size: 10px;
+  font-weight: 650;
+}
+.commerce-page .scope-note {
+  line-height: 1.85;
+}
+.commerce-page .settings-section > .scope-note:first-of-type {
+  margin-top: 12px;
+}
+.commerce-page .reply-toolbar > a:not(.button),
+.commerce-page .settings-section > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #a7bfff;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.commerce-page .reply-toolbar > a:not(.button):hover,
+.commerce-page .settings-section > a:hover {
+  color: #d8e6ff;
+}
+/* Catalog: clear controls, readable product identities and a restrained data grid. */
+.commerce-offers > .select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 13px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border, #243246);
+  border-radius: 10px;
+  background: #101722;
+}
+.commerce-offers > .select-label input {
+  width: 76px;
+  min-height: 34px;
+}
+.commerce-offers .catalog-summary {
+  gap: 16px;
+  margin: 20px 0 24px;
+}
+.commerce-offers .catalog-summary > div {
+  position: relative;
+  padding: 24px;
+  border-radius: 15px;
+  border-color: #2b3d57;
+  background:
+    radial-gradient(ellipse at 100% 0, #5378ff13, transparent 65%),
+    var(--surface-1, #101722);
+}
+.commerce-offers .catalog-summary > div > span {
+  color: #97acca;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.1px;
+}
+.commerce-offers .catalog-summary strong {
+  color: #f1f6ff;
+  margin: 16px 0 10px;
+  font-size: 34px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.commerce-offers .catalog-summary small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+.commerce-offers .table-toolbar {
+  gap: 14px;
+  padding: 20px 22px;
+}
+.commerce-offers .table-toolbar > .input-search {
+  flex: 2 1 250px;
+}
+.commerce-offers .table-toolbar > .select-label {
+  flex: 1 1 125px;
+  min-width: 125px;
+}
+.commerce-offers table th:first-child,
+.commerce-offers table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #111a29;
+  border-right: 1px solid #24324680;
+  min-width: 240px;
+  max-width: 330px;
+}
+.commerce-offers table th:first-child {
+  background: #131e2e;
+}
+.commerce-offers table .table-primary {
+  color: #e5edfb;
+  line-height: 1.6;
+  font-weight: 600;
+}
+.commerce-offers table .mono {
+  color: #8195b1;
+  font-size: 10px;
+  letter-spacing: 0.1px;
+}
+.commerce-offers .catalog-control-cell .button {
+  min-height: 34px;
+}
+.commerce-offers .catalog-control-cell small,
+.commerce-offers .catalog-read-only {
+  font-size: 11px;
+  line-height: 1.7;
+}
+.commerce-offers .catalog-pending-panel {
+  border-radius: 14px;
+}
+.commerce-offers .catalog-pending-row {
+  padding: 15px 18px;
+}
+.commerce-offers .catalog-pending-notice {
+  padding: 17px 18px;
+}
+/* Preparation surfaces: keep the choice, exact proposal and approval distinct. */
+.commerce-batch .batch-layout,
+.commerce-import .batch-layout {
+  gap: 22px;
+}
+.commerce-batch .batch-listing {
+  border: 1px solid transparent;
+  border-bottom-color: #24324690;
+  padding: 17px 13px;
+  border-radius: 10px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+.commerce-batch .batch-listing:hover {
+  background: #5378ff08;
+}
+.commerce-batch .batch-listing:has(input:checked) {
+  background: #5378ff13;
+  border-color: #5378ff4d;
+}
+.commerce-batch .batch-listing > span > strong {
+  font-weight: 600;
+  line-height: 1.6;
+}
+.commerce-batch .batch-selection {
+  background: #0b1220;
+  border: 1px solid #243246;
+  border-radius: 12px;
+  padding: 16px 20px 16px 34px;
+  margin-top: 17px;
+  margin-bottom: 20px;
+  font-size: 12px;
+}
+.commerce-import input[type="file"] {
+  min-height: 92px;
+  padding: 20px;
+  border-style: dashed;
+  border-color: #4b6594;
+  background: #5378ff08;
+  cursor: pointer;
+}
+.commerce-import input[type="file"]::file-selector-button {
+  padding: 10px 14px;
+  margin-right: 16px;
+  background: #1f3150;
+  color: #d7e6ff;
+  border: 1px solid #405984;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.commerce-import textarea[rows="12"] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.85;
+  background: #0b1220;
+}
+.commerce-import .batch-list > .settings-section {
+  background: #0e1725;
+  border: 1px solid #2b3d57;
+  border-radius: 13px;
+  padding: 20px;
+  margin-bottom: 12px;
+}
+.commerce-editor .back-link {
+  margin-bottom: 18px;
+  color: #a7bfff;
+  font-size: 12px;
+}
+.commerce-editor .settings-grid {
+  gap: 24px;
+  align-items: start;
+}
+.commerce-editor .settings-section > .capability-list {
+  border: 1px solid #2a3d59;
+  border-radius: 12px;
+  padding: 4px 16px;
+  margin-bottom: 22px;
+  background: #0c1523;
+}
+/* Official seller reads: use the actual unread state, never a simulated status. */
+.commerce-seller .seller-availability-card {
+  background:
+    radial-gradient(ellipse at 100% 0, #5378ff12, transparent 62%),
+    var(--surface-1, #101722);
+}
+.commerce-seller .seller-notification {
+  position: relative;
+  padding: 22px 20px;
+  margin: 10px 0;
+  border: 1px solid #243246;
+  border-radius: 12px;
+  background: #0e1623;
+}
+.commerce-seller .seller-notification.is-unread {
+  border-left: 3px solid #7798ff;
+  background: linear-gradient(105deg, #5378ff0d, #0e1623);
+}
+.commerce-seller .seller-notification > div > strong {
+  color: #dce8fc;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.commerce-seller .seller-notification > p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #a4b5ce;
+}
+.commerce-seller .seller-notification > small {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+/* Reports feel like a document workspace, with an explicit selected format. */
+.commerce-reports .report-card-grid {
+  gap: 18px;
+}
+.commerce-reports .report-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 17px;
+  padding: 25px;
+  border-radius: 17px;
+  border: 1px solid #293b56;
+  background: linear-gradient(150deg, #151f30, #101722);
+  box-shadow: 0 8px 24px #00000014;
+}
+.commerce-reports .report-option:hover {
+  background: linear-gradient(150deg, #1a2942, #111b2a);
+  transform: translateY(-2px);
+  border-color: #607fb8;
+}
+.commerce-reports .report-option.selected {
+  border-color: #7899ff;
+  background:
+    radial-gradient(ellipse at 100% 0, #5378ff1f, transparent 70%),
+    linear-gradient(150deg, #182640, #111b2b);
+  box-shadow:
+    inset 0 0 0 1px #5378ff2a,
+    0 12px 30px #00000018;
+}
+.report-option-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+}
+.report-format-index {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  color: #9ab0d0;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.report-selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8c9db7;
+  font-size: 10px;
+}
+.report-selection > svg {
+  opacity: 0.3;
+}
+.report-selection.is-selected {
+  color: #a9c2ff;
+}
+.report-selection.is-selected > svg {
+  opacity: 1;
+}
+.report-option-icon {
+  display: grid;
+  place-items: center;
+  width: 53px;
+  height: 58px;
+  margin: 5px 0 1px;
+  color: #abc3ff;
+  border: 1px solid #5474b350;
+  border-radius: 10px 16px 10px 10px;
+  background: linear-gradient(150deg, #2b416a, #172944);
+  box-shadow: inset 0 1px 0 #9cbcff13;
+}
+.commerce-reports .report-option > strong {
+  color: #edf4ff;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+  line-height: 1.5;
+}
+.commerce-reports
+  .report-option
+  > span:not(.report-option-top):not(.report-option-icon) {
+  color: #a1b3ce;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.commerce-reports .report-option > small {
+  display: inline-flex;
+  margin-top: auto;
+  padding: 6px 9px;
+  background: #90b5f00b;
+  border: 1px solid #90b5f01c;
+  border-radius: 6px;
+  color: #9db5d7;
+  font-size: 10px;
+}
+.commerce-reports .reporting-period {
+  max-width: 980px;
+}
+.commerce-reports .reporting-period .reply-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 640px;
+}
+/* Pricing: separate authority, editable assumptions and observed market evidence. */
+.pricing-controls-panel .pricing-policy-summary,
+.pricing-controls-panel .pricing-quote-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+.pricing-controls-panel .pricing-policy-summary > div,
+.pricing-controls-panel .pricing-quote-summary > div {
+  display: grid;
+  align-content: start;
+  align-items: start;
+  gap: 11px;
+  padding: 18px;
+  border: 1px solid #2a3b54;
+  border-radius: 12px;
+  background: #0e1726;
+  min-width: 0;
+}
+.pricing-controls-panel .pricing-policy-summary > div > span,
+.pricing-controls-panel .pricing-quote-summary > div > span {
+  font-size: 11px;
+  color: #8fa5c5;
+}
+.pricing-controls-panel .pricing-policy-summary > div > strong,
+.pricing-controls-panel .pricing-quote-summary > div > strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.7;
+  color: #e0ecff;
+  overflow-wrap: anywhere;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.pricing-controls-panel .pricing-rule-form {
+  padding: 24px;
+  border: 1px solid #2a3b54;
+  border-radius: 15px;
+  background: #0c1421;
+}
+.pricing-controls-panel .pricing-rule-form .reply-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.pricing-controls-panel .pricing-rule-form > .button {
+  justify-self: start;
+}
+.pricing-controls-panel .checkbox-label {
+  padding: 14px 15px;
+  border: 1px solid #2a3b54;
+  border-radius: 10px;
+  background: #5378ff08;
+  line-height: 1.9;
+}
+.pricing-controls-panel details {
+  padding: 17px 19px;
+  border: 1px solid #243246;
+  border-radius: 12px;
+  margin-top: 22px;
+  background: #0b1320;
+}
+.pricing-controls-panel details summary {
+  cursor: pointer;
+  color: #afc5e8;
+  font-size: 12px;
+}
+.commerce-pricing-engine {
+  border-radius: 20px;
+  border-color: #345275;
+  background:
+    radial-gradient(ellipse at 90% 5%, #346eaa29, transparent 55%),
+    linear-gradient(115deg, #172740, #0f1928 70%);
+  padding: 30px;
+}
+.commerce-pricing-engine .engine-steps {
+  gap: 12px;
+}
+.commerce-pricing-engine .engine-steps > span {
+  color: #b3c6e2;
+  background: #0c172780;
+  border-color: #405c823f;
+  border-radius: 11px;
+  padding: 13px 15px;
+}
+.commerce-pricing-engine .engine-steps i {
+  color: #7bc9e6;
+}
+.commerce-pricing-engine .repricing-status-grid {
+  gap: 12px;
+}
+.commerce-pricing-engine .repricing-status-grid > div {
+  border: 1px solid #44618c47;
+  background: #0c172780;
+  border-radius: 12px;
+  padding: 19px;
+}
+.commerce-pricing-engine .repricing-status-grid strong {
+  color: #edf5ff;
+  font-size: 30px;
+}
+.commerce-pricing-engine .repricing-status-grid span {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #99b0d1;
+}
+.commerce-pricing-engine .table-scroll {
+  border: 1px solid #334c6e;
+  border-radius: 13px;
+  margin-top: 22px;
+}
+@media (max-width: 1050px) {
+  .commerce-workflow > li {
+    padding: 16px;
+    gap: 10px;
+  }
+  .commerce-workflow li > svg {
+    display: none;
+  }
+  .commerce-reports .report-option {
+    padding: 20px;
+  }
+  .report-option-top {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+@media (max-width: 680px) {
+  .commerce-workflow {
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: 12px;
+    margin-bottom: 20px;
+  }
+  .commerce-workflow > li {
+    padding: 13px 15px;
+  }
+  .commerce-workflow > li + li {
+    border-left: 0;
+    border-top: 1px solid #243246a0;
+  }
+  .commerce-workflow li > div {
+    gap: 3px;
+  }
+  .commerce-workflow strong {
+    font-size: 12px;
+  }
+  .commerce-workflow li > div > span {
+    font-size: 11px;
+  }
+  .commerce-step-number {
+    width: 29px;
+    height: 29px;
+    border-radius: 8px;
+  }
+  .commerce-offers .catalog-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .commerce-offers .catalog-summary > div {
+    padding: 18px;
+  }
+  .commerce-offers .catalog-summary strong {
+    font-size: 29px;
+  }
+  .commerce-offers .table-toolbar {
+    padding: 16px;
+  }
+  .commerce-offers table th:first-child,
+  .commerce-offers table td:first-child {
+    position: static;
+    min-width: 210px;
+    max-width: 270px;
+  }
+  .report-option-top {
+    flex-direction: row;
+    align-items: center;
+  }
+  .commerce-reports .reporting-period .reply-fields,
+  .pricing-controls-panel .pricing-rule-form .reply-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pricing-controls-panel .pricing-rule-form {
+    padding: 17px;
+  }
+  .pricing-controls-panel .pricing-policy-summary,
+  .pricing-controls-panel .pricing-quote-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .commerce-pricing-engine {
+    padding: 22px 18px;
+  }
+  .commerce-pricing-engine .repricing-status-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .commerce-pricing-engine .repricing-status-grid > div {
+    padding: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .commerce-batch .batch-listing,
+  .commerce-reports .report-option {
+    transition: none;
+  }
+  .commerce-reports .report-option:hover {
+    transform: none;
+  }
+}

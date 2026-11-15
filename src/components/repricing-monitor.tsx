@@ -56,7 +56,10 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
       (item) => item.mode === "automatic" && item.review_status !== "approved",
     );
   return (
-    <section className="repricing-live" aria-label="Repricing live monitor">
+    <section
+      className="repricing-live commerce-pricing-engine"
+      aria-label="Repricing live monitor"
+    >
       <span className="eyebrow">
         <Zap size={14} style={{ display: "inline" }} /> PRECISION REPRICING
         ENGINE

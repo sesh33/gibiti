@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { FileDown, FileUp, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CommerceWorkflow } from "@/components/commerce-workflow";
 import { PageHeading } from "@/components/page-heading";
 import { api } from "@/lib/api-client";
 import { unitPrice } from "@/lib/utils";
@@ -138,7 +139,7 @@ export function OfferImportCenter({ configured }: { configured: boolean }) {
     }
   }
   return (
-    <>
+    <div className="commerce-page commerce-import">
       <PageHeading
         eyebrow="VALIDATED CATALOG IMPORT"
         title="Prepare products. Review every creation."
@@ -151,6 +152,22 @@ export function OfferImportCenter({ configured }: { configured: boolean }) {
           <Link href="/offers">Back to catalog</Link>
         </Button>
       </PageHeading>
+      <CommerceWorkflow
+        steps={[
+          {
+            title: "Add your products",
+            description: "CSV or JSON with the supplied fields",
+          },
+          {
+            title: "Validate the preview",
+            description: "Resolve every issue before requesting",
+          },
+          {
+            title: "Review each creation",
+            description: "Independent approval, one row at a time",
+          },
+        ]}
+      />
       <div className="info-banner">
         <ShieldCheck size={16} />
         <span>
@@ -293,9 +310,9 @@ export function OfferImportCenter({ configured }: { configured: boolean }) {
                   onChange={(event) => setConfirmed(event.target.checked)}
                 />
                 <span>
-                  I checked each product&apos;s game, environment, pricing, stock and
-                  delivery. I understand that each request needs independent
-                  review.
+                  I checked each product&apos;s game, environment, pricing,
+                  stock and delivery. I understand that each request needs
+                  independent review.
                 </span>
               </label>
               <div className="batch-list">
@@ -387,6 +404,6 @@ export function OfferImportCenter({ configured }: { configured: boolean }) {
           )}
         </section>
       </div>
-    </>
+    </div>
   );
 }

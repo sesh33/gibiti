@@ -1,0 +1,529 @@
+/* Private control surfaces: configuration, credentials, runtime and roles. */
+.settings-workspace,
+.automation-workspace {
+  min-width: 0;
+}
+.settings-workspace .settings-grid,
+.automation-workspace .settings-grid {
+  gap: 22px;
+}
+.settings-readiness {
+  position: relative;
+  overflow: hidden;
+  padding: 26px 28px;
+  border-color: #345475;
+  background:
+    radial-gradient(ellipse at 95% 0%, #3a9ed317, transparent 56%),
+    linear-gradient(120deg, #14263b, #101a2a 72%);
+}
+.settings-readiness::after {
+  position: absolute;
+  right: -35px;
+  top: -65px;
+  width: 230px;
+  height: 230px;
+  border: 1px solid #9ccef010;
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+.settings-readiness-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.settings-kicker,
+.settings-private-label {
+  color: #9ebce1;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.65px;
+}
+.settings-private-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid #9bc8f223;
+  border-radius: 7px;
+  letter-spacing: 0.25px;
+  color: #bad2ec;
+}
+.settings-readiness .readiness-shield {
+  background: #305a8d35;
+  border: 1px solid #7eb1f33d;
+  box-shadow: 0 0 30px #5086df0b;
+}
+.settings-readiness .readiness-intro h2 {
+  max-width: 650px;
+  font-size: clamp(20px, 2vw, 26px);
+  letter-spacing: -0.7px;
+  line-height: 1.3;
+}
+.settings-readiness .readiness-intro .eyebrow {
+  display: none;
+}
+.settings-readiness .readiness-checks {
+  gap: 12px;
+  margin-top: 24px;
+}
+.settings-readiness .readiness-checks > div {
+  background: #0a142245;
+  border-color: #7596bc22;
+  border-radius: 10px;
+  padding: 16px;
+}
+.settings-workspace .settings-control-card,
+.connection-vault {
+  padding: 25px;
+  min-width: 0;
+}
+.settings-workspace .settings-heading {
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 21px;
+}
+.settings-workspace .settings-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+.settings-workspace .settings-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border: 1px solid #6c99e633;
+  border-radius: 12px;
+  background: linear-gradient(140deg, #24457465, #172335);
+  color: #a3c5ff;
+}
+.settings-workspace .settings-heading h2 {
+  margin: 1px 0 7px;
+  font-size: 17px;
+  line-height: 1.35;
+  letter-spacing: -0.3px;
+}
+.settings-workspace .settings-heading p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #93a7c1;
+}
+.settings-workspace .settings-control-card > p,
+.connection-vault > p {
+  font-size: 12px;
+  line-height: 1.85;
+  color: #93a8c4;
+}
+.settings-workspace .capability-list,
+.automation-workspace .capability-list,
+.connection-vault .capability-list {
+  border: 1px solid #6f8dbf21;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #09111b35;
+  margin-bottom: 18px;
+}
+.settings-workspace .capability-list > div,
+.automation-workspace .capability-list > div,
+.connection-vault .capability-list > div {
+  padding: 14px 15px;
+  border-color: #7590b418;
+  gap: 16px;
+}
+.settings-workspace .capability-list > div:last-child,
+.automation-workspace .capability-list > div:last-child {
+  border-bottom: 0;
+}
+.settings-workspace .capability-list > div > :last-child,
+.automation-workspace .capability-list > div > :last-child {
+  text-align: right;
+  overflow-wrap: anywhere;
+  color: #bfd1e9;
+}
+.settings-workspace .variable-grid {
+  gap: 10px;
+}
+.settings-workspace .variable-row {
+  min-height: 53px;
+  border-color: #6b88ac2b;
+  border-radius: 9px;
+  background: #0d1726;
+  padding: 14px 16px;
+  transition:
+    border-color 160ms,
+    background 160ms;
+}
+.settings-workspace .variable-row:hover {
+  border-color: #648fe784;
+  background: #15233a;
+}
+.settings-workspace .variable-row code {
+  color: #b4c9e8;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.settings-workspace .variable-row > svg {
+  color: #8ea9d4;
+  flex-shrink: 0;
+}
+.settings-workspace .setup-steps {
+  list-style: decimal-leading-zero;
+  padding-left: 29px;
+  font-size: 12px;
+  color: #a6bbd4;
+  line-height: 1.85;
+}
+.settings-workspace .setup-steps li {
+  padding: 8px 0 8px 6px;
+}
+.settings-workspace .setup-steps li::marker {
+  color: #759ae2;
+  font-variant-numeric: tabular-nums;
+}
+.connection-vault {
+  position: relative;
+  border-color: #426494;
+  background:
+    radial-gradient(ellipse at 100% 0, #426ada15, transparent 58%),
+    linear-gradient(130deg, #152237, #101824 70%);
+}
+.connection-security-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #6c92c42b;
+}
+.connection-security-flow > div {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 4px 10px;
+  min-width: 0;
+}
+.connection-security-flow > div > span {
+  grid-row: span 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #6d99dd2c;
+  background: #1a3151;
+  font-size: 10px;
+  font-weight: 600;
+  color: #abcaff;
+  font-variant-numeric: tabular-nums;
+}
+.connection-security-flow strong {
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.5;
+  color: #d1dff2;
+}
+.connection-security-flow small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: #91a7c3;
+}
+.connection-vault .connection-form {
+  padding: 18px;
+  background: #090f1c7a;
+  border: 1px solid #6484b52f;
+  border-radius: 11px;
+  margin: 22px 0 14px;
+}
+.connection-vault .connection-form .field-label {
+  font-size: 12px;
+  gap: 10px;
+}
+.connection-vault .connection-form input {
+  min-height: 45px;
+  background: #0e1828;
+}
+.connection-vault .connection-form > .button {
+  min-height: 45px;
+}
+.connection-privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.connection-privacy-note > svg {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  color: #87a7d2;
+}
+.connection-vault .seller-health {
+  border-top: 1px solid #7192bd26;
+  margin-top: 23px;
+  padding-top: 22px;
+}
+.automation-principles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin: -8px 0 23px;
+}
+.automation-principles > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #a0b6d7;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.automation-principles svg {
+  color: #8fb9ef;
+}
+.automation-workspace .settings-section {
+  padding: 25px;
+}
+.automation-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 19px;
+}
+.automation-section-heading > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border: 1px solid #6e9de031;
+  border-radius: 12px;
+  color: #a8caff;
+  background: linear-gradient(140deg, #1f3c62, #142237);
+}
+.automation-section-heading small {
+  display: block;
+  margin-bottom: 6px;
+  color: #849fc5;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+}
+.automation-section-heading h2 {
+  margin: 0;
+  color: #dbe7f8;
+  letter-spacing: -0.3px;
+  font-size: 17px;
+  line-height: 1.4;
+}
+.automation-workspace .automation-choice {
+  align-items: flex-start;
+  padding: 15px;
+  border: 1px solid #6c8cba29;
+  border-radius: 10px;
+  background: #0c162361;
+  color: #b5c8e2;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.automation-workspace .automation-choice input {
+  flex-shrink: 0;
+  margin-top: 4px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.automation-workspace .automation-choice:has(input:checked) {
+  border-color: #6f9ff563;
+  background: #26477b24;
+}
+.automation-rules-panel {
+  margin-top: 24px;
+}
+.role-profiles-panel {
+  padding: 25px;
+}
+.role-profiles-panel .panel-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.role-profiles-panel .panel-title h2 > svg {
+  color: #a5c5f7;
+}
+.role-profile-collection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: 11px;
+  margin-top: 20px;
+}
+.role-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #7394c52b;
+  border-radius: 10px;
+  background: linear-gradient(115deg, #192b43, #111d2c);
+  padding: 17px;
+  min-width: 0;
+}
+.role-profile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  border: 1px solid #7099d52b;
+  border-radius: 9px;
+  color: #a7c8f5;
+  background: #2b487d30;
+  flex: 0 0 auto;
+}
+.role-profile-card > div {
+  flex: 1;
+  min-width: 0;
+}
+.role-profile-card strong,
+.role-profile-card small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.role-profile-card strong {
+  color: #d7e5f7;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.role-profile-card small,
+.role-profile-overrides {
+  color: #91aacc;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.role-profile-overrides {
+  text-align: right;
+  white-space: nowrap;
+}
+.role-profile-form {
+  display: grid;
+  gap: 15px;
+  margin-top: 22px;
+}
+.settings-workspace a:focus-visible,
+.connection-vault button:focus-visible,
+.role-profiles-panel button:focus-visible {
+  outline: 2px solid #9bc7ff;
+  outline-offset: 4px;
+}
+@media (max-width: 900px) {
+  .connection-security-flow {
+    gap: 16px;
+  }
+  .connection-security-flow > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .connection-security-flow > div > span {
+    grid-row: auto;
+    margin-bottom: 5px;
+  }
+}
+@media (max-width: 600px) {
+  .settings-workspace .settings-heading,
+  .connection-vault .settings-heading,
+  .automation-workspace .settings-heading {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 10px 12px;
+    align-items: start;
+  }
+  .settings-workspace .settings-heading > .settings-icon,
+  .connection-vault .settings-heading > .settings-icon,
+  .automation-workspace .settings-heading > .settings-icon {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 40px;
+    height: 40px;
+  }
+  .settings-workspace .settings-heading > div,
+  .connection-vault .settings-heading > div,
+  .automation-workspace .settings-heading > div {
+    grid-column: 2;
+    width: 100%;
+    min-width: 0;
+  }
+  .settings-workspace .settings-heading > .pill,
+  .connection-vault .settings-heading > .pill,
+  .automation-workspace .settings-heading > .pill {
+    grid-column: 2;
+    justify-self: start;
+    margin: 0;
+  }
+  .settings-workspace .settings-control-card,
+  .connection-vault,
+  .automation-workspace .settings-section,
+  .role-profiles-panel {
+    padding: 20px 17px;
+  }
+  .settings-readiness {
+    padding: 21px 18px;
+  }
+  .settings-readiness-topline {
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .settings-private-label {
+    font-size: 9px;
+    letter-spacing: 0;
+    flex-shrink: 0;
+  }
+  .settings-kicker {
+    padding-top: 8px;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .settings-workspace .settings-heading {
+    flex-wrap: wrap;
+  }
+  .settings-workspace .settings-heading > .pill {
+    margin-left: 56px;
+  }
+  .connection-security-flow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+    padding-bottom: 20px;
+  }
+  .connection-security-flow > div {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 2px 10px;
+  }
+  .connection-security-flow > div > span {
+    grid-row: span 2;
+    margin-bottom: 0;
+  }
+  .connection-vault .connection-form {
+    padding: 15px;
+  }
+  .settings-workspace .capability-list > div,
+  .automation-workspace .capability-list > div {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 13px;
+  }
+  .settings-workspace .capability-list > div > :last-child,
+  .automation-workspace .capability-list > div > :last-child {
+    text-align: left;
+  }
+  .automation-section-heading h2 {
+    font-size: 16px;
+  }
+  .role-profile-card {
+    padding: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-workspace .variable-row {
+    transition: none;
+  }
+}

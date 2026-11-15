@@ -88,7 +88,7 @@ export function Settings({ configured }: { configured: boolean }) {
     }
   }
   return (
-    <>
+    <div className="settings-workspace">
       <PageHeading
         eyebrow="WORKSPACE CONFIGURATION"
         title="Connected carefully. Controlled completely."
@@ -103,7 +103,16 @@ export function Settings({ configured }: { configured: boolean }) {
           {status.isFetching ? "Refreshing..." : "Refresh status"}
         </Button>
       </PageHeading>
-      <section className="readiness-banner" aria-label="Workspace readiness">
+      <section
+        className="readiness-banner settings-readiness"
+        aria-label="Workspace readiness"
+      >
+        <div className="settings-readiness-topline">
+          <span className="settings-kicker">YOUR CONTROL PLANE</span>
+          <span className="settings-private-label">
+            <LockKeyhole size={12} /> Private workspace
+          </span>
+        </div>
         <div className="readiness-intro">
           <span className="readiness-shield">
             <ShieldCheck size={23} />
@@ -153,7 +162,7 @@ export function Settings({ configured }: { configured: boolean }) {
       </section>
       <div className="settings-grid">
         <EldoradoConnection configured={configured} />
-        <section className="data-panel settings-section">
+        <section className="data-panel settings-section settings-control-card">
           <div className="settings-heading">
             <span className="settings-icon">
               <Database size={21} />
@@ -211,7 +220,7 @@ export function Settings({ configured }: { configured: boolean }) {
               : "Configuration presence does not prove connectivity. Database and authentication readiness require live validation."}
           </p>
         </section>
-        <section className="data-panel settings-section">
+        <section className="data-panel settings-section settings-control-card">
           <div className="settings-heading">
             <span className="settings-icon">
               <KeyRound size={21} />
@@ -299,8 +308,9 @@ export function Settings({ configured }: { configured: boolean }) {
           </Button>
         </section>
         <section
-          className="data-panel settings-section full-width"
+          className="data-panel settings-section full-width settings-control-card"
           aria-label="Integration health"
+          id="integration-health"
         >
           <div className="settings-heading">
             <span className="settings-icon">
@@ -443,7 +453,10 @@ export function Settings({ configured }: { configured: boolean }) {
             Open scheduler and automation controls →
           </Link>
         </section>
-        <section className="data-panel settings-section full-width">
+        <section
+          className="data-panel settings-section full-width settings-control-card"
+          id="environment-bindings"
+        >
           <div className="settings-heading">
             <span className="settings-icon">
               <LockKeyhole size={21} />
@@ -482,7 +495,7 @@ export function Settings({ configured }: { configured: boolean }) {
             </span>
           )}
         </section>
-        <section className="data-panel settings-section">
+        <section className="data-panel settings-section settings-control-card">
           <div className="settings-heading">
             <span className="settings-icon">
               <MessageSquare size={21} />
@@ -513,7 +526,7 @@ export function Settings({ configured }: { configured: boolean }) {
             </a>
           </Button>
         </section>
-        <section className="data-panel settings-section">
+        <section className="data-panel settings-section settings-control-card">
           <div className="settings-heading">
             <span className="settings-icon">
               <Sparkles size={21} />
@@ -538,7 +551,7 @@ export function Settings({ configured }: { configured: boolean }) {
         </section>
       </div>
       {!status.isError && status.data?.errors.length ? (
-        <section className="data-panel settings-section">
+        <section className="data-panel settings-section settings-control-card">
           <h2>Recent integration errors</h2>
           {status.data.errors.map((error, index) => (
             <article key={index} className="detail-section">
@@ -564,6 +577,6 @@ export function Settings({ configured }: { configured: boolean }) {
           ))}
         </section>
       ) : null}
-    </>
+    </div>
   );
 }

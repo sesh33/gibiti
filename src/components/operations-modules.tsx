@@ -5,7 +5,20 @@ import { InventoryActions } from "@/components/inventory-actions";
 import { MarketplaceExecution } from "@/components/marketplace-execution";
 import type { MarketplaceChange } from "@/domains/eldorado/contracts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Layers3, Plus, ShieldCheck, X } from "lucide-react";
+import {
+  Activity,
+  Check,
+  Copy,
+  Layers3,
+  Plus,
+  ShieldCheck,
+  Users,
+  X,
+} from "lucide-react";
+import {
+  OperationGuide,
+  OperationPanelHeading,
+} from "@/components/operation-guide";
 import { api } from "@/lib/api-client";
 import { money } from "@/lib/utils";
 import {
@@ -199,7 +212,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
     setOpen(true);
   }
   return (
-    <>
+    <div className="ops-workspace team-workspace">
       <PageHeading
         eyebrow="PEOPLE & ACCESS"
         title="Your team. Your rules."
@@ -222,7 +235,23 @@ export function TeamModule({ configured }: { configured: boolean }) {
           {notice}
         </p>
       )}
-      <section className="data-panel">
+      <OperationGuide
+        icon={Users}
+        label="Access architecture"
+        title="Built around your people."
+        steps={[
+          "Individual accounts",
+          "Explicit permissions",
+          "Reviewed changes",
+        ]}
+      />
+      <section className="data-panel ops-directory-panel">
+        <OperationPanelHeading
+          icon={Users}
+          title="Team directory"
+          description="Manage people and access from one clear view."
+          label="STAFF ACCESS"
+        />
         {team.isError ? (
           <QueryError message={team.error.message} />
         ) : (
@@ -241,10 +270,20 @@ export function TeamModule({ configured }: { configured: boolean }) {
                   {team.data?.items.map((user) => (
                     <tr key={user.id}>
                       <td>
-                        <strong className="table-primary">
-                          {user.display_name}
-                        </strong>
-                        <small>{user.email}</small>
+                        <div className="ops-person">
+                          <span
+                            className="ops-person-avatar"
+                            aria-hidden="true"
+                          >
+                            {user.display_name.slice(0, 2).toUpperCase()}
+                          </span>
+                          <span>
+                            <strong className="table-primary">
+                              {user.display_name}
+                            </strong>
+                            <small>{user.email}</small>
+                          </span>
+                        </div>
                       </td>
                       <td>
                         <span className="state-badge">
@@ -523,7 +562,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
 export function InventoryModule({ configured }: { configured: boolean }) {
@@ -572,7 +611,7 @@ export function InventoryModule({ configured }: { configured: boolean }) {
     onError: (e) => setNotice(e.message),
   });
   return (
-    <>
+    <div className="ops-workspace inventory-workspace">
       <PageHeading
         eyebrow="DIGITAL STOCKROOM"
         title="Inventory, under control."
@@ -601,7 +640,23 @@ export function InventoryModule({ configured }: { configured: boolean }) {
           {notice}
         </p>
       )}
-      <section className="data-panel">
+      <OperationGuide
+        icon={Layers3}
+        label="Stock management"
+        title="Every item. A clear place."
+        steps={[
+          "Internal stock",
+          "Atomic reservations",
+          "Order-linked history",
+        ]}
+      />
+      <section className="data-panel ops-directory-panel">
+        <OperationPanelHeading
+          icon={Layers3}
+          title="Inventory register"
+          description="Digital stock with a traceable reservation history."
+          label="INTERNAL STOCK"
+        />
         {inventory.isError ? (
           <QueryError message={inventory.error.message} />
         ) : (
@@ -622,7 +677,9 @@ export function InventoryModule({ configured }: { configured: boolean }) {
                     <tr key={item.id}>
                       <td className="mono">{item.sku}</td>
                       <td>{item.title}</td>
-                      <td>{item.category}</td>
+                      <td>
+                        <span className="ops-category">{item.category}</span>
+                      </td>
                       <td>
                         <span
                           className={`state-badge ${item.status === "available" ? "success" : ""}`}
@@ -748,7 +805,7 @@ export function InventoryModule({ configured }: { configured: boolean }) {
           </form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
 export function ApprovalsModule({ configured }: { configured: boolean }) {
@@ -776,7 +833,7 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
     onError: (e) => setNotice(e.message),
   });
   return (
-    <>
+    <div className="ops-workspace approvals-workspace">
       <PageHeading
         eyebrow="OPERATIONAL SAFETY"
         title="A deliberate second look."
@@ -795,7 +852,19 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
           {notice}
         </p>
       )}
-      <section className="data-panel">
+      <OperationGuide
+        icon={ShieldCheck}
+        label="Deliberate decisions"
+        title="A checkpoint before the next move."
+        steps={["Exact request", "Independent review", "Confirmed execution"]}
+      />
+      <section className="data-panel ops-directory-panel">
+        <OperationPanelHeading
+          icon={ShieldCheck}
+          title="Review queue"
+          description="Inspect sensitive requests and their recorded outcomes."
+          label="REVIEW & EXECUTION"
+        />
         {approvals.isError ? (
           <QueryError message={approvals.error.message} />
         ) : (
@@ -946,7 +1015,7 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
 export function OffersModule({ configured }: { configured: boolean }) {
@@ -1046,13 +1115,25 @@ export function ActivityModule({ configured }: { configured: boolean }) {
     enabled: configured,
   });
   return (
-    <>
+    <div className="ops-workspace activity-workspace">
       <PageHeading
         eyebrow="TRACEABILITY"
         title="Every action leaves a record."
         description="An append-only operational trail, visible only to authorized staff."
       />
-      <section className="data-panel">
+      <OperationGuide
+        icon={Activity}
+        label="Operational memory"
+        title="The details behind every decision."
+        steps={["Recorded actors", "Traceable targets", "Timestamped events"]}
+      />
+      <section className="data-panel ops-directory-panel">
+        <OperationPanelHeading
+          icon={Activity}
+          title="Activity ledger"
+          description="A chronological record of your workspace operations."
+          label="AUDIT HISTORY"
+        />
         {activity.isError ? (
           <QueryError message={activity.error.message} />
         ) : (
@@ -1070,7 +1151,10 @@ export function ActivityModule({ configured }: { configured: boolean }) {
                 <tbody>
                   {activity.data?.items.map((event) => (
                     <tr key={event.id}>
-                      <td className="table-primary">{event.action}</td>
+                      <td className="table-primary">
+                        <span className="ops-event-marker" aria-hidden="true" />
+                        {event.action}
+                      </td>
                       <td className="mono">
                         {event.actor_id?.slice(0, 12) ?? "System"}
                       </td>
@@ -1095,6 +1179,6 @@ export function ActivityModule({ configured }: { configured: boolean }) {
           </>
         )}
       </section>
-    </>
+    </div>
   );
 }

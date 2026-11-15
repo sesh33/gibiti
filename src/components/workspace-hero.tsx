@@ -57,10 +57,10 @@ export function WorkspaceHero({ configured }: { configured: boolean }) {
     },
   ].filter((item) => can(item.permission));
   return (
-    <section className="workspace-hero">
+    <section className="workspace-hero rivox-hero">
       <div className="workspace-hero-copy">
         <div className="hero-overline">
-          <span className="hero-dot" />
+          <span className="hero-dot" aria-hidden="true" />
           {workspaceBrand.name} · SELLER OPERATING SYSTEM
         </div>
         <h2>
@@ -86,8 +86,14 @@ export function WorkspaceHero({ configured }: { configured: boolean }) {
         </div>
       </div>
       <div className="hero-orbit" aria-hidden="true">
+        <span className="hero-coordinate hero-coordinate-top">
+          FOCUS / CONTROL / MOMENTUM
+        </span>
         <div className="orbit-ring orbit-ring-one" />
         <div className="orbit-ring orbit-ring-two" />
+        <div className="orbit-ring orbit-ring-three" />
+        <span className="orbit-point orbit-point-one" />
+        <span className="orbit-point orbit-point-two" />
         <div className="orbit-core">
           <Zap size={42} fill="currentColor" />
         </div>
@@ -99,6 +105,9 @@ export function WorkspaceHero({ configured }: { configured: boolean }) {
           <ShieldCheck size={14} />
           <span>YOUR FLOOR. YOUR RULES.</span>
         </div>
+        <span className="hero-coordinate hero-coordinate-bottom">
+          ONE WORKSPACE. YOUR OPERATION.
+        </span>
       </div>
       <div className="hero-shortcuts">
         {actions.map((action) => (

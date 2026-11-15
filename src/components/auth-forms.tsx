@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { normalizeMfaQrCode } from "@/domains/authentication/mfa-qr";
 import { workspaceBrand } from "@/lib/branding";
+import { AccessPillars } from "@/components/access-pillars";
 export function AuthForm({
   mode,
   configured = true,
@@ -78,7 +79,7 @@ export function AuthForm({
         ? "A stronger layer of protection."
         : "Make this workspace yours.";
   return (
-    <main className="auth-page">
+    <main className="auth-page rivox-access">
       <div className="auth-art">
         <Link href="/" className="wordmark">
           <span className="brand-symbol">
@@ -102,11 +103,13 @@ export function AuthForm({
             permissions.
           </div>
         </div>
+        <AccessPillars />
         <span className="auth-footnote">
           {workspaceBrand.name} CONTROL · PRIVATE OPERATIONS
         </span>
       </div>
       <section className="auth-panel">
+        <span className="auth-panel-overline">YOUR PRIVATE WORKSPACE</span>
         <span className="auth-lock">
           <LockKeyhole size={22} />
         </span>

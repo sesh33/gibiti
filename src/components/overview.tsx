@@ -9,6 +9,8 @@ import {
   PackageCheck,
   ShoppingBag,
   TriangleAlert,
+  ShieldCheck,
+  BarChart3,
 } from "lucide-react";
 import { PageHeading } from "@/components/page-heading";
 import { EmptyState, QueryError } from "@/components/empty-state";
@@ -54,43 +56,62 @@ export function Overview({ configured }: { configured: boolean }) {
         </Button>
       </PageHeading>
       <WorkspaceHero configured={configured} />
-      <div
-        className="metric-grid"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}
-      >
+      <div className="overview-section-label">
+        <div>
+          <BarChart3 size={15} />
+          <h2>Your operation at a glance</h2>
+        </div>
+        <span>SYNCHRONIZED RECORDS</span>
+      </div>
+      <div className="metric-grid overview-metrics">
         {[
           {
             label: "Synchronized orders",
             value: data?.orders,
             icon: ShoppingBag,
+            tone: "blue",
           },
-          { label: "Known open orders", value: data?.pending, icon: Clock3 },
+          {
+            label: "Known open orders",
+            value: data?.pending,
+            icon: Clock3,
+            tone: "amber",
+          },
           {
             label: "Received orders",
             value: data?.received,
             icon: PackageCheck,
             detail: "Delivery confirmed; excluded from completed volume",
+            tone: "cyan",
           },
           {
             label: "Completed orders",
             value: data?.completed,
             icon: CheckCircle2,
+            tone: "green",
           },
           {
             label: "Canceled orders",
             value: data?.canceled,
             icon: TriangleAlert,
+            tone: "rose",
           },
           {
             label: "Other / unclassified",
             value: data?.other,
             icon: CircleHelp,
+            tone: "violet",
           },
         ].map((metric) => (
-          <article className="metric-card" key={metric.label}>
+          <article
+            className={`metric-card overview-metric metric-${metric.tone}`}
+            key={metric.label}
+          >
             <div>
               <span>{metric.label}</span>
-              <metric.icon size={16} />
+              <span className="overview-metric-icon">
+                <metric.icon size={17} />
+              </span>
             </div>
             <strong>{metric.value ?? "—"}</strong>
             <small>
@@ -158,9 +179,12 @@ export function Overview({ configured }: { configured: boolean }) {
         </section>
       )}
       <div className="overview-grid">
-        <section className="data-panel">
+        <section className="data-panel overview-volume">
           <div className="panel-title">
-            <h2>Completed order volume</h2>
+            <h2>
+              <BarChart3 size={17} />
+              Completed order volume
+            </h2>
             <span className="pill pill-muted">Partial history</span>
           </div>
           {data && Object.keys(data.completedVolume).length ? (
@@ -173,6 +197,10 @@ export function Overview({ configured }: { configured: boolean }) {
                   </div>
                 ),
               )}
+              <p className="scope-note volume-scope">
+                Completed orders only. Each currency stays separate; this is
+                recorded order volume.
+              </p>
             </div>
           ) : (
             <EmptyState
@@ -190,27 +218,32 @@ export function Overview({ configured }: { configured: boolean }) {
           )}
         </section>
         <section className="data-panel overview-readiness">
+          <span className="readiness-card-emblem">
+            <ShieldCheck size={24} />
+          </span>
           <span className="eyebrow">YOUR WORKSPACE</span>
           <h2>Build on a secure foundation.</h2>
-          <div>
-            <ShieldIcon /> Individual accounts & database permissions
-          </div>
-          <div>
-            <ShieldIcon /> Audited internal operations
-          </div>
-          <div>
-            {data && data.orders > 0 ? (
-              <>
-                <ShieldIcon /> Orders synchronized
-              </>
-            ) : (
-              <>
-                <Clock3 size={16} /> No synchronized orders yet
-              </>
-            )}
-          </div>
-          <div>
-            <Clock3 size={16} /> Reply library available to copy
+          <div className="foundation-checks">
+            <div>
+              <ShieldIcon /> Individual accounts & database permissions
+            </div>
+            <div>
+              <ShieldIcon /> Audited internal operations
+            </div>
+            <div>
+              {data && data.orders > 0 ? (
+                <>
+                  <ShieldIcon /> Orders synchronized
+                </>
+              ) : (
+                <>
+                  <Clock3 size={16} /> No synchronized orders yet
+                </>
+              )}
+            </div>
+            <div>
+              <Clock3 size={16} /> Reply library available to copy
+            </div>
           </div>
           <Link href="/settings" className="empty-link">
             Workspace configuration

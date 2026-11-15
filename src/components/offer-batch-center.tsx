@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Layers3, ListChecks, ShieldCheck } from "lucide-react";
+import { CommerceWorkflow } from "@/components/commerce-workflow";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { QueryError } from "@/components/empty-state";
@@ -145,7 +146,7 @@ export function OfferBatchCenter({ configured }: { configured: boolean }) {
     return body.details.guaranteedDeliveryTime;
   }
   return (
-    <>
+    <div className="commerce-page commerce-batch">
       <PageHeading
         eyebrow="REVIEWED CATALOG WORKBENCH"
         title="More listings. The same control."
@@ -160,6 +161,22 @@ export function OfferBatchCenter({ configured }: { configured: boolean }) {
           Back to catalog →
         </Link>
       </PageHeading>
+      <CommerceWorkflow
+        steps={[
+          {
+            title: "Select listings",
+            description: "Choose the exact products to update",
+          },
+          {
+            title: "Inspect the proposal",
+            description: "Validate every amount and price floor",
+          },
+          {
+            title: "Request approval",
+            description: "One clear audit trail for each change",
+          },
+        ]}
+      />
       <div className="batch-layout">
         <section className="data-panel settings-section">
           <h2>
@@ -458,6 +475,6 @@ export function OfferBatchCenter({ configured }: { configured: boolean }) {
           Start a new preview
         </Button>
       )}
-    </>
+    </div>
   );
 }

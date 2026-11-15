@@ -1,4 +1,4 @@
-import { ArrowUpRight, Inbox } from "lucide-react";
+import { ArrowUpRight, Inbox, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 export function EmptyState({
   title,
@@ -12,6 +12,8 @@ export function EmptyState({
   return (
     <div className="empty-state">
       <span className="empty-icon">
+        <span className="empty-orbit empty-orbit-one" aria-hidden="true" />
+        <span className="empty-orbit empty-orbit-two" aria-hidden="true" />
         <Inbox size={25} />
       </span>
       <h3>{title}</h3>
@@ -34,9 +36,16 @@ export function QueryError({
 }) {
   return (
     <div className="query-error" role="alert">
-      <strong>Unable to load this module</strong>
-      <p>{message}</p>
-      {retry && <button onClick={retry}>Try again</button>}
+      <TriangleAlert
+        className="query-error-icon"
+        size={20}
+        aria-hidden="true"
+      />
+      <div>
+        <strong>Unable to load this module</strong>
+        <p>{message}</p>
+        {retry && <button onClick={retry}>Try again</button>}
+      </div>
     </div>
   );
 }

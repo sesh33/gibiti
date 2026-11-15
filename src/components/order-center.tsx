@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeading } from "@/components/page-heading";
+import { OperationPanelHeading } from "@/components/operation-guide";
 import { EmptyState, QueryError } from "@/components/empty-state";
 import { api, ApiError } from "@/lib/api-client";
 import { money } from "@/lib/utils";
@@ -142,7 +143,7 @@ export function OrderCenter({ configured }: { configured: boolean }) {
     router.push(`${pathname}?${next}`);
   }
   return (
-    <>
+    <div className="ops-workspace orders-workspace">
       <PageHeading
         eyebrow="SELLER OPERATIONS"
         title="Order center"
@@ -161,7 +162,7 @@ export function OrderCenter({ configured }: { configured: boolean }) {
               : "Sync orders"}
         </Button>
       </PageHeading>
-      <div className="info-banner">
+      <div className="info-banner ops-scope-banner">
         <ShoppingBag size={14} />
         <span>
           Read-only Eldorado synchronization. Results are limited to the pages
@@ -169,7 +170,7 @@ export function OrderCenter({ configured }: { configured: boolean }) {
         </span>
       </div>
       {canSync && (
-        <div className="reply-toolbar">
+        <div className="reply-toolbar ops-sync-toolbar">
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -216,7 +217,13 @@ export function OrderCenter({ configured }: { configured: boolean }) {
           {notice}
         </p>
       )}
-      <section className="data-panel">
+      <section className="data-panel ops-directory-panel">
+        <OperationPanelHeading
+          icon={ShoppingBag}
+          title="Order workspace"
+          description="Find the right order. Keep every next step in context."
+          label="SYNCHRONIZED RECORDS"
+        />
         <div className="table-toolbar">
           <form
             className="input-search"
@@ -293,13 +300,23 @@ export function OrderCenter({ configured }: { configured: boolean }) {
                   {orders.data?.items.map((order) => (
                     <tr key={order.id}>
                       <td>
-                        <Link
-                          className="table-primary"
-                          href={`/orders/${order.id}`}
-                        >
-                          {order.buyer_username}
-                        </Link>
-                        <small>{order.id.slice(0, 8).toUpperCase()}</small>
+                        <div className="ops-person">
+                          <span
+                            className="ops-person-avatar"
+                            aria-hidden="true"
+                          >
+                            {order.buyer_username.slice(0, 2).toUpperCase()}
+                          </span>
+                          <span>
+                            <Link
+                              className="table-primary"
+                              href={`/orders/${order.id}`}
+                            >
+                              {order.buyer_username}
+                            </Link>
+                            <small>{order.id.slice(0, 8).toUpperCase()}</small>
+                          </span>
+                        </div>
                       </td>
                       <td>{order.product_title}</td>
                       <td>
@@ -309,8 +326,12 @@ export function OrderCenter({ configured }: { configured: boolean }) {
                           {order.state}
                         </span>
                       </td>
-                      <td>{order.quantity}</td>
-                      <td>{money(Number(order.amount), order.currency)}</td>
+                      <td>
+                        <span className="ops-quantity">{order.quantity}</span>
+                      </td>
+                      <td className="ops-money">
+                        {money(Number(order.amount), order.currency)}
+                      </td>
                       <td>
                         {new Date(order.purchased_at).toLocaleDateString(
                           "en-US",
@@ -368,6 +389,6 @@ export function OrderCenter({ configured }: { configured: boolean }) {
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }

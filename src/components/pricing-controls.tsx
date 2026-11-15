@@ -295,7 +295,7 @@ export function PricingControls({
     estimates = quote ? quoteEstimates(quote.proof) : null;
   return (
     <section
-      className="data-panel settings-section full-width"
+      className="data-panel settings-section full-width pricing-controls-panel"
       aria-label="Pricing controls"
     >
       <div className="settings-heading">
@@ -312,7 +312,7 @@ export function PricingControls({
       </div>
       {rules.isError && <p role="alert">{rules.error.message}</p>}
       {policy && (
-        <div className="capability-list">
+        <div className="capability-list pricing-policy-summary">
           <div>
             <span>Saved minimum unit price</span>
             <strong>{unitPrice(Number(policy.floor), policy.currency)}</strong>
@@ -338,7 +338,7 @@ export function PricingControls({
         </div>
       )}
       {owner ? (
-        <form onSubmit={save} className="catalog-editor-form">
+        <form onSubmit={save} className="catalog-editor-form pricing-rule-form">
           <div className="reply-fields">
             <label className="field-label">
               Minimum unit price
@@ -642,7 +642,7 @@ export function PricingControls({
       </p>
       {quote && (
         <div>
-          <div className="capability-list">
+          <div className="capability-list pricing-quote-summary">
             <div>
               <span>Lowest observed equivalent unit price</span>
               <strong>
@@ -676,7 +676,7 @@ export function PricingControls({
               </strong>
             </div>
           </div>
-          <div className="capability-list">
+          <div className="capability-list pricing-quote-summary">
             <div>
               <span>Effective minimum unit price</span>
               <strong>

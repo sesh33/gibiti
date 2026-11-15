@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, ShieldCheck } from "lucide-react";
+import { Plus, ShieldCheck, Users } from "lucide-react";
 import { api } from "@/lib/api-client";
 import {
   roles,
@@ -102,11 +102,23 @@ export function RoleProfiles({ configured }: { configured: boolean }) {
         employee. Assignments still require a separate reviewer. Existing
         employees never change automatically.
       </p>
-      {query.data?.items.map((profile) => (
-        <span className="state-badge" key={profile.id}>
-          {profile.name} · {profile.base_role.replaceAll("_", " ")}
-        </span>
-      ))}
+      <div className="role-profile-collection">
+        {query.data?.items.map((profile) => (
+          <article className="role-profile-card" key={profile.id}>
+            <span className="role-profile-icon">
+              <Users size={17} />
+            </span>
+            <div>
+              <strong>{profile.name}</strong>
+              <small>{profile.base_role.replaceAll("_", " ")}</small>
+            </div>
+            <span className="role-profile-overrides">
+              {profile.overrides.length}{" "}
+              {profile.overrides.length === 1 ? "override" : "overrides"}
+            </span>
+          </article>
+        ))}
+      </div>
       {query.isError && <p className="form-error">{query.error.message}</p>}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -117,6 +129,7 @@ export function RoleProfiles({ configured }: { configured: boolean }) {
             approved.
           </DialogDescription>
           <form
+            className="role-profile-form"
             onSubmit={(e) => {
               e.preventDefault();
               save.mutate();

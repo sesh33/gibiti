@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyRound, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 
@@ -122,7 +122,10 @@ export function EldoradoConnection({ configured }: { configured: boolean }) {
     }
   }
   return (
-    <section className="data-panel settings-section full-width">
+    <section
+      className="data-panel settings-section full-width connection-vault"
+      id="seller-connection"
+    >
       <div className="settings-heading">
         <span className="settings-icon">
           <KeyRound size={21} />
@@ -136,6 +139,26 @@ export function EldoradoConnection({ configured }: { configured: boolean }) {
         >
           {connection.data?.configured ? "Configured" : "Connection required"}
         </span>
+      </div>
+      <div
+        className="connection-security-flow"
+        aria-label="Connection security flow"
+      >
+        <div>
+          <span>01</span>
+          <strong>Verify the seller</strong>
+          <small>Read-only access check</small>
+        </div>
+        <div>
+          <span>02</span>
+          <strong>Encrypt the credential</strong>
+          <small>Stored on the server</small>
+        </div>
+        <div>
+          <span>03</span>
+          <strong>Keep access individual</strong>
+          <small>Employees use their own login</small>
+        </div>
       </div>
       {connection.isError ? (
         <p role="alert">{connection.error.message}</p>
@@ -197,7 +220,8 @@ export function EldoradoConnection({ configured }: { configured: boolean }) {
                   : "Verify & connect"}
             </Button>
           </form>
-          <p className="scope-note">
+          <p className="scope-note connection-privacy-note">
+            <LockKeyhole size={13} aria-hidden="true" />
             The check reads orders without changing them. The secret is
             encrypted on the server and cannot be displayed again.
           </p>

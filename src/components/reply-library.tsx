@@ -110,7 +110,7 @@ export function ReplyLibrary() {
   const selected =
     filtered.find((reply) => reply.id === selectedId) ?? filtered[0];
   return (
-    <>
+    <div className="ops-workspace replies-workspace">
       <PageHeading
         eyebrow="TEAM PLAYBOOK"
         title="Better replies. Ready to copy."
@@ -147,27 +147,39 @@ export function ReplyLibrary() {
         </label>
       </div>
       <div className="reply-layout">
-        <section className="reply-list" aria-label="Reply templates">
-          {filtered.map((reply) => (
-            <button
-              key={reply.id}
-              className={`data-panel reply-option ${selected?.id === reply.id ? "selected" : ""}`}
-              aria-pressed={selected?.id === reply.id}
-              onClick={() => setSelectedId(reply.id)}
-            >
-              <span className="eyebrow">
-                {reply.category} · {reply.language}
-              </span>
-              <strong>{reply.title}</strong>
-              <span>{reply.body.slice(0, 110)}…</span>
-            </button>
-          ))}
-          {!filtered.length && (
-            <p role="status">No matching replies. Try another search.</p>
-          )}
-        </section>
+        <div className="ops-reply-collection">
+          <div className="ops-reply-heading">
+            <span>
+              <MessageSquareText size={15} />
+              Template collection
+            </span>
+            <strong>{filtered.length}</strong>
+          </div>
+          <section className="reply-list" aria-label="Reply templates">
+            {filtered.map((reply) => (
+              <button
+                key={reply.id}
+                className={`data-panel reply-option ${selected?.id === reply.id ? "selected" : ""}`}
+                aria-pressed={selected?.id === reply.id}
+                onClick={() => setSelectedId(reply.id)}
+              >
+                <span className="eyebrow">
+                  <span>{reply.category}</span>
+                  <span className="ops-language-tag">{reply.language}</span>
+                </span>
+                <strong>{reply.title}</strong>
+                <span className="ops-reply-excerpt">
+                  {reply.body.slice(0, 110)}…
+                </span>
+              </button>
+            ))}
+            {!filtered.length && (
+              <p role="status">No matching replies. Try another search.</p>
+            )}
+          </section>
+        </div>
         {selected && <ReplyEditor key={selected.id} reply={selected} />}
       </div>
-    </>
+    </div>
   );
 }

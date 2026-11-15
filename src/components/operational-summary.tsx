@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { QueryError } from "@/components/empty-state";
+import { Activity, ArrowUpRight, ShieldCheck, History } from "lucide-react";
 
 type Status = {
   connection: {
@@ -56,9 +57,17 @@ export function OperationalSummary({ configured }: { configured: boolean }) {
       ["blocked", "executing"].includes(item.status),
     ) ?? [];
   return (
-    <div className="overview-grid" style={{ marginBottom: 24 }}>
-      <section className="data-panel settings-section">
-        <h2>Connection and operational alerts</h2>
+    <div className="overview-grid overview-control-grid">
+      <section className="data-panel settings-section overview-control-card">
+        <div className="overview-card-heading">
+          <span className="overview-card-icon">
+            <ShieldCheck size={19} />
+          </span>
+          <div>
+            <span className="eyebrow">OPERATIONAL HEALTH</span>
+            <h2>Connection and operational alerts</h2>
+          </div>
+        </div>
         {status.isPending && (
           <p className="scope-note">
             {configured
@@ -123,11 +132,19 @@ export function OperationalSummary({ configured }: { configured: boolean }) {
           </p>
         )}
         <Link className="empty-link" href="/automation">
-          Review automation and saved rules →
+          Review automation and saved rules <ArrowUpRight size={14} />
         </Link>
       </section>
-      <section className="data-panel settings-section">
-        <h2>Recent action history</h2>
+      <section className="data-panel settings-section overview-history-card">
+        <div className="overview-card-heading">
+          <span className="overview-card-icon">
+            <History size={19} />
+          </span>
+          <div>
+            <span className="eyebrow">ACCOUNTABILITY</span>
+            <h2>Recent action history</h2>
+          </div>
+        </div>
         {history.isPending && (
           <p className="scope-note">
             {configured
@@ -137,10 +154,13 @@ export function OperationalSummary({ configured }: { configured: boolean }) {
         )}
         {history.isError && <QueryError message={history.error.message} />}
         {history.data?.items.slice(0, 5).map((item) => (
-          <div className="capability-list" key={item.id}>
+          <div className="capability-list overview-history-item" key={item.id}>
             <div>
-              <span>{item.action}</span>
-              <strong>{item.status}</strong>
+              <span>
+                <Activity size={13} />
+                {item.action}
+              </span>
+              <strong className="pill pill-muted">{item.status}</strong>
             </div>
             <p className="scope-note">
               {new Date(item.created_at).toLocaleString()}
@@ -153,7 +173,7 @@ export function OperationalSummary({ configured }: { configured: boolean }) {
           </p>
         )}
         <Link className="empty-link" href="/approvals">
-          Open reviewed operations →
+          Open reviewed operations <ArrowUpRight size={14} />
         </Link>
       </section>
     </div>

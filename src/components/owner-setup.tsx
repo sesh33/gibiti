@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowRight, LockKeyhole, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
+import { workspaceBrand } from "@/lib/branding";
+import { AccessPillars } from "@/components/access-pillars";
 
 type AccountMode = "existing" | "create-local" | "verified-hosted";
 type EmailStep = "email" | "verify" | "password";
@@ -210,13 +212,16 @@ export function OwnerSetup({
         : "Create Owner membership";
 
   return (
-    <main className="auth-page">
+    <main className="auth-page rivox-access owner-access">
       <div className="auth-art">
         <Link href="/" className="wordmark">
           <span className="brand-symbol">
             <Zap size={20} fill="currentColor" />
           </span>
-          RIVOX<span className="wordmark-sub">CONTROL</span>
+          <span className="brand-name" title={workspaceBrand.name}>
+            {workspaceBrand.name}
+          </span>
+          <span className="wordmark-sub">CONTROL</span>
         </Link>
         <div className="auth-manifesto">
           <span className="eyebrow">PRIVATE FIRST-RUN SETUP</span>
@@ -234,6 +239,7 @@ export function OwnerSetup({
             MFA.
           </div>
         </div>
+        <AccessPillars />
         <span className="auth-footnote">
           {hosted
             ? "PRIVATE OWNER ACCESS · VERIFIED EMAIL · HTTPS"
@@ -243,6 +249,7 @@ export function OwnerSetup({
         </span>
       </div>
       <section className="auth-panel">
+        <span className="auth-panel-overline">PRIVATE OWNER ONBOARDING</span>
         <span className="auth-lock">
           <LockKeyhole size={22} />
         </span>

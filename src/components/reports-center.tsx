@@ -1,8 +1,15 @@
 "use client";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, FileSpreadsheet, FileText, ShieldCheck } from "lucide-react";
+import {
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
+import { CommerceWorkflow } from "@/components/commerce-workflow";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
@@ -87,14 +94,30 @@ export function ReportsCenter({ configured }: { configured: boolean }) {
     }
   }
   return (
-    <>
+    <div className="commerce-page commerce-reports">
       <PageHeading
         eyebrow="OFFICIAL SELLER REPORTING"
         title="Your operation, with the numbers."
         description="Download the account-wide reports supplied by Eldorado. Individual staff access, MFA and an audited export protect financial data."
       />
+      <CommerceWorkflow
+        steps={[
+          {
+            title: "Choose a report",
+            description: "Select the official CSV or PDF",
+          },
+          {
+            title: "Set the period",
+            description: "Use an inclusive UTC date range",
+          },
+          {
+            title: "Export securely",
+            description: "MFA, permissions and an audited download",
+          },
+        ]}
+      />
       <div className="report-card-grid">
-        {reports.map((report) => (
+        {reports.map((report, index) => (
           <button
             type="button"
             aria-pressed={kind === report.id}
@@ -103,7 +126,20 @@ export function ReportsCenter({ configured }: { configured: boolean }) {
             key={report.id}
             disabled={busy}
           >
-            <report.icon size={24} />
+            <span className="report-option-top" aria-hidden="true">
+              <span className="report-format-index">
+                0{index + 1} / {report.id === "invoice" ? "PDF" : "CSV"}
+              </span>
+              <span
+                className={`report-selection${kind === report.id ? " is-selected" : ""}`}
+              >
+                <CheckCircle2 size={16} aria-hidden="true" />
+                {kind === report.id ? "Selected" : "Choose report"}
+              </span>
+            </span>
+            <span className="report-option-icon">
+              <report.icon size={24} />
+            </span>
             <strong>{report.title}</strong>
             <span>{report.detail}</span>
             <small>
@@ -112,7 +148,7 @@ export function ReportsCenter({ configured }: { configured: boolean }) {
           </button>
         ))}
       </div>
-      <section className="data-panel settings-section">
+      <section className="data-panel settings-section reporting-period">
         <h2>Choose your reporting period</h2>
         <p className="scope-note">
           Dates are inclusive in UTC. This application allows up to 367 calendar
@@ -171,6 +207,6 @@ export function ReportsCenter({ configured }: { configured: boolean }) {
           </p>
         )}
       </section>
-    </>
+    </div>
   );
 }

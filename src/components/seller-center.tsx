@@ -159,7 +159,7 @@ export function SellerCenter({ configured }: { configured: boolean }) {
     confirmationWord =
       selected?.kind === "seller.offline" ? "OFFLINE" : "ONLINE";
   return (
-    <>
+    <div className="commerce-page commerce-seller">
       <PageHeading
         eyebrow="CONNECTED SELLER OPERATIONS"
         title="A command center for your seller account."
@@ -208,8 +208,16 @@ export function SellerCenter({ configured }: { configured: boolean }) {
           </p>
         ))}
       <div className="settings-grid">
-        <section className="data-panel settings-section">
-          <h2>Seller availability</h2>
+        <section className="data-panel settings-section seller-availability-card">
+          <div className="commerce-section-title">
+            <span className="commerce-section-icon">
+              <Power size={18} />
+            </span>
+            <div>
+              <span className="commerce-overline">ACCOUNT CONTROL</span>
+              <h2>Seller availability</h2>
+            </div>
+          </div>
           <p className="scope-note">
             Online/offline affects this seller account across listings. Only the
             Owner can request it here, with MFA. The API exposes the switch
@@ -238,8 +246,16 @@ export function SellerCenter({ configured }: { configured: boolean }) {
             Check your seller account on Eldorado ↗
           </a>
         </section>
-        <section className="data-panel settings-section">
-          <h2>Account restrictions</h2>
+        <section className="data-panel settings-section seller-restrictions-card">
+          <div className="commerce-section-title">
+            <span className="commerce-section-icon">
+              <ShieldCheck size={18} />
+            </span>
+            <div>
+              <span className="commerce-overline">OFFICIAL ACCOUNT READ</span>
+              <h2>Account restrictions</h2>
+            </div>
+          </div>
           {overview.data?.checks.find((item) => item.name === "restrictions")
             ?.ok ? (
             Array.isArray(
@@ -308,7 +324,10 @@ export function SellerCenter({ configured }: { configured: boolean }) {
         )}
         {notifications.isLoading && <p role="status">Loading notifications…</p>}
         {notifications.data?.items.map((item, index) => (
-          <article className="seller-notification" key={item.id ?? index}>
+          <article
+            className={`seller-notification${item.isRead === false ? " is-unread" : ""}`}
+            key={item.id ?? index}
+          >
             <div>
               <strong>
                 {item.title ?? item.type ?? "Eldorado notification"}
@@ -511,6 +530,6 @@ export function SellerCenter({ configured }: { configured: boolean }) {
           {message && <p role="status">{message}</p>}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

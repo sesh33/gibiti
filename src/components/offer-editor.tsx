@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { unitPrice } from "@/lib/utils";
+import { CommerceWorkflow } from "@/components/commerce-workflow";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { PredefinedFields } from "@/components/predefined-fields";
@@ -163,7 +164,7 @@ export function OfferEditor({ configured }: { configured: boolean }) {
     }
   }
   return (
-    <>
+    <div className="commerce-page commerce-editor">
       <Link className="back-link" href="/offers">
         <ArrowLeft size={14} />
         Offers
@@ -179,6 +180,22 @@ export function OfferEditor({ configured }: { configured: boolean }) {
             : (source.data?.local.title ??
               "Read current marketplace values before preparing a change.")
         }
+      />
+      <CommerceWorkflow
+        steps={[
+          {
+            title: "Read the listing",
+            description: "Start with verified marketplace values",
+          },
+          {
+            title: "Prepare the change",
+            description: "Keep product details and limits explicit",
+          },
+          {
+            title: "Review & execute",
+            description: "Independent approval before a write",
+          },
+        ]}
       />
       <div className="info-banner">
         <ShieldCheck size={17} />
@@ -457,6 +474,6 @@ export function OfferEditor({ configured }: { configured: boolean }) {
       {!create && target && (
         <PricingControls offerId={target} configured={configured} />
       )}
-    </>
+    </div>
   );
 }

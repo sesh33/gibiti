@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { workspaceBrand } from "@/lib/branding";
 import {
@@ -16,6 +16,8 @@ import {
   Inbox,
   Layers3,
   MessageSquareText,
+  Menu,
+  X,
   LogOut,
   Search,
   Settings2,
@@ -111,6 +113,31 @@ const operationPaths = new Set([
   "/reports",
   "/offers/batch",
 ]);
+const navigationOrder = [
+  "/overview",
+  "/orders",
+  "/offers",
+  "/offers/batch",
+  "/inventory",
+  "/templates",
+  "/seller",
+  "/reports",
+  "/automation",
+  "/team",
+  "/approvals",
+  "/activity",
+  "/settings",
+  "/inbox",
+];
+const compactQuery = "(max-width: 820px)";
+function subscribeCompact(callback: () => void) {
+  const media = window.matchMedia(compactQuery);
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
+function compactSnapshot() {
+  return window.matchMedia(compactQuery).matches;
+}
 export function WorkspaceShell({
   children,
   staff,
@@ -127,28 +154,58 @@ export function WorkspaceShell({
     [query, setQuery] = useState(""),
     [notifications, setNotifications] = useState(false),
     [loggingOut, setLoggingOut] = useState(false),
-    [logoutError, setLogoutError] = useState("");
+    [logoutError, setLogoutError] = useState(""),
+    [mobileOpen, setMobileOpen] = useState(false);
+  const compact = useSyncExternalStore(
+    subscribeCompact,
+    compactSnapshot,
+    () => false,
+  );
+  const menuRef = useRef<HTMLButtonElement>(null),
+    closeMenuRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!compact || !mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const frame = requestAnimationFrame(() => closeMenuRef.current?.focus());
+    const trigger = menuRef.current;
+    return () => {
+      cancelAnimationFrame(frame);
+      document.body.style.overflow = previousOverflow;
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, [compact, mobileOpen]);
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     function keyboard(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
+        setMobileOpen(false);
         setSearchOpen((value) => !value);
       }
-      if (event.key === "Escape") setNotifications(false);
+      if (event.key === "Escape") {
+        setNotifications(false);
+        setMobileOpen(false);
+      }
     }
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
   }, []);
-  const visible = navigation.filter(
-    (item) =>
-      !staff ||
-      !item.permission ||
-      staff.permissions.includes(item.permission) ||
-      (item.href === "/orders" && staff.permissions.includes("orders.read")) ||
-      (item.href === "/inventory" &&
-        staff.permissions.includes("inventory.manage")),
-  );
+  const visible = navigation
+    .filter(
+      (item) =>
+        !staff ||
+        !item.permission ||
+        staff.permissions.includes(item.permission) ||
+        (item.href === "/orders" &&
+          staff.permissions.includes("orders.read")) ||
+        (item.href === "/inventory" &&
+          staff.permissions.includes("inventory.manage")),
+    )
+    .sort(
+      (a, b) =>
+        navigationOrder.indexOf(a.href) - navigationOrder.indexOf(b.href),
+    );
   const workspaceNavigation = visible.filter((item) =>
     operationPaths.has(item.href),
   );
@@ -170,6 +227,44 @@ export function WorkspaceShell({
   const canManageSettings =
     !staff || staff.permissions.includes("settings.manage");
   const initials = staff?.name.slice(0, 2).toUpperCase() ?? "RX";
+  const currentTitle =
+    pathname === "/offers/import"
+      ? "Import listings"
+      : pathname === "/offers/edit"
+        ? "Offer editor"
+        : pathname.startsWith("/orders/")
+          ? "Order details"
+          : (current?.label ?? "Workspace");
+  const commands = [
+    ...visible,
+    ...(!staff || staff.permissions.includes("offers.create")
+      ? [
+          {
+            href: "/offers/import",
+            label: "Import listings",
+            icon: FileSpreadsheet,
+          },
+          { href: "/offers/edit", label: "Create an offer", icon: Layers3 },
+        ]
+      : []),
+  ];
+  function trapNavigationFocus(event: React.KeyboardEvent<HTMLElement>) {
+    if (!compact || !mobileOpen || event.key !== "Tab") return;
+    const controls = [
+      ...event.currentTarget.querySelectorAll<HTMLElement>(
+        "a[href],button:not([disabled])",
+      ),
+    ].filter((item) => item.getClientRects().length > 0);
+    const first = controls[0],
+      last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  }
   async function logout() {
     setLoggingOut(true);
     setLogoutError("");
@@ -192,22 +287,59 @@ export function WorkspaceShell({
     }
   }
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <Link href="/" className="wordmark">
-          <span className="brand-symbol">
-            <Zap size={20} fill="currentColor" />
-          </span>
-          <span className="brand-name" title={workspaceBrand.name}>
-            {workspaceBrand.name}
-          </span>
-          <span className="wordmark-sub">CONTROL</span>
-        </Link>
+    <div
+      className="app-shell"
+      data-navigation-open={compact && mobileOpen ? "true" : "false"}
+    >
+      <a className="skip-link" href="#workspace-content">
+        Skip to content
+      </a>
+      {compact && mobileOpen && (
+        <button
+          className="navigation-scrim"
+          aria-label="Close navigation overlay"
+          tabIndex={-1}
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+      <aside
+        className="sidebar"
+        id="workspace-navigation"
+        inert={compact && !mobileOpen ? true : undefined}
+        aria-hidden={compact && !mobileOpen ? true : undefined}
+        onKeyDown={trapNavigationFocus}
+      >
+        <div className="sidebar-brand-row">
+          <Link
+            href="/"
+            className="wordmark"
+            onClick={() => setMobileOpen(false)}
+          >
+            <span className="brand-symbol">
+              <Zap size={20} fill="currentColor" />
+            </span>
+            <span className="brand-name" title={workspaceBrand.name}>
+              {workspaceBrand.name}
+            </span>
+            <span className="wordmark-sub">CONTROL</span>
+          </Link>
+          <button
+            ref={closeMenuRef}
+            className="navigation-close icon-button"
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+          >
+            <X size={20} />
+          </button>
+        </div>
         <button
           className="workspace-switch"
           aria-label="Workspace settings"
           disabled={!canManageSettings}
-          onClick={() => router.push("/settings")}
+          onClick={() => {
+            setMobileOpen(false);
+            router.push("/settings");
+          }}
         >
           <span className="workspace-logo">{workspaceBrand.initial}</span>
           <span>
@@ -228,6 +360,7 @@ export function WorkspaceShell({
                 current?.href === item.href ? "nav-link active" : "nav-link"
               }
               href={item.href}
+              onClick={() => setMobileOpen(false)}
             >
               <item.icon size={17} />
               <span>{item.label}</span>
@@ -249,6 +382,7 @@ export function WorkspaceShell({
                 current?.href === item.href ? "nav-link active" : "nav-link"
               }
               href={item.href}
+              onClick={() => setMobileOpen(false)}
             >
               <item.icon size={17} />
               <span>{item.label}</span>
@@ -267,6 +401,7 @@ export function WorkspaceShell({
                 current?.href === item.href ? "nav-link active" : "nav-link"
               }
               href={item.href}
+              onClick={() => setMobileOpen(false)}
             >
               <item.icon size={17} />
               <span>{item.label}</span>
@@ -275,8 +410,11 @@ export function WorkspaceShell({
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-status">
-            <span className="status-dot" />
-            <span>Private seller operations</span>
+            <ShieldCheck size={15} aria-hidden="true" />
+            <span>
+              Private seller operations
+              <small>Individual access. Shared control.</small>
+            </span>
           </div>
           <div className="profile">
             <span className="avatar">{initials}</span>
@@ -306,11 +444,25 @@ export function WorkspaceShell({
           )}
         </div>
       </aside>
-      <div className="main-shell">
+      <div
+        className="main-shell"
+        inert={compact && mobileOpen ? true : undefined}
+      >
         <header className="topbar">
-          <div className="breadcrumbs">
-            Workspace <span>/</span>{" "}
-            <strong>{current?.label ?? "Order details"}</strong>
+          <div className="topbar-leading">
+            <button
+              ref={menuRef}
+              className="navigation-toggle icon-button"
+              aria-label="Open navigation"
+              aria-expanded={compact && mobileOpen}
+              aria-controls="workspace-navigation"
+              onClick={() => setMobileOpen(true)}
+            >
+              <Menu size={21} />
+            </button>
+            <div className="breadcrumbs">
+              Workspace <span>/</span> <strong>{currentTitle}</strong>
+            </div>
           </div>
           <div className="topbar-actions">
             <button
@@ -331,7 +483,6 @@ export function WorkspaceShell({
               onClick={() => setNotifications((value) => !value)}
             >
               <Bell size={17} />
-              <span className="notification-dot" />
             </button>
             <span
               className="topbar-avatar"
@@ -376,7 +527,9 @@ export function WorkspaceShell({
             </Link>
           </div>
         )}
-        <main className="page-content">{children}</main>
+        <main className="page-content" id="workspace-content" tabIndex={-1}>
+          {children}
+        </main>
         <footer className="workspace-footer">
           <span>
             <span className="status-dot" /> {workspaceBrand.name} CONTROL{" "}
@@ -404,13 +557,16 @@ export function WorkspaceShell({
             <Command size={14} />
           </label>
           <div className="command-results">
-            {visible
+            {commands
               .filter((item) =>
                 item.label.toLowerCase().includes(query.toLowerCase()),
               )
               .map((item) => (
                 <Link
-                  onClick={() => setSearchOpen(false)}
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setSearchOpen(false);
+                  }}
                   href={item.href}
                   key={item.href}
                 >
@@ -423,7 +579,10 @@ export function WorkspaceShell({
             {query && canSearchOrders && (
               <Link
                 href={`/orders?search=${encodeURIComponent(query)}`}
-                onClick={() => setSearchOpen(false)}
+                onClick={() => {
+                  setMobileOpen(false);
+                  setSearchOpen(false);
+                }}
               >
                 <Search size={16} />
                 Search orders for “{query}”<ArrowUpRight size={13} />

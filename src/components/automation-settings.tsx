@@ -2,6 +2,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Activity,
+  LockKeyhole,
+  ShieldCheck,
+  SlidersHorizontal,
+} from "lucide-react";
 import { PageHeading } from "@/components/page-heading";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
@@ -98,16 +104,35 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
     }
   }
   return (
-    <>
+    <div className="automation-workspace">
       <PageHeading
         eyebrow="PERSISTENT OPERATION CONTROLS"
         title="Automation, on your terms."
         description="Durable floors, preferences and processing history. Simulation first; automatic writes only after explicit authorization."
       />
+      <div className="automation-principles" aria-label="Automation safeguards">
+        <span>
+          <SlidersHorizontal size={14} /> Offer-specific floors
+        </span>
+        <span>
+          <ShieldCheck size={14} /> Independent review
+        </span>
+        <span>
+          <Activity size={14} /> Recorded outcomes
+        </span>
+      </div>
       <RepricingMonitor configured={configured} />
       <div className="settings-grid">
         <section className="data-panel settings-section">
-          <h2>Workspace background service</h2>
+          <div className="automation-section-heading">
+            <span>
+              <Activity size={20} />
+            </span>
+            <div>
+              <small>RUNTIME OBSERVABILITY</small>
+              <h2>Workspace background service</h2>
+            </div>
+          </div>
           <p className="scope-note">
             Seller read verification:{" "}
             {!state.isError && state.data?.connection?.verifiedOnThisServer
@@ -203,10 +228,18 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
           {state.isError && <p role="alert">{state.error.message}</p>}
         </section>
         <section className="data-panel settings-section">
-          <h2>Owner authorization</h2>
+          <div className="automation-section-heading">
+            <span>
+              <LockKeyhole size={20} />
+            </span>
+            <div>
+              <small>EXPLICIT AUTHORITY</small>
+              <h2>Owner authorization</h2>
+            </div>
+          </div>
           {owner ? (
             <form onSubmit={save} className="catalog-editor-form">
-              <label className="checkbox-label">
+              <label className="checkbox-label automation-choice">
                 <input
                   type="checkbox"
                   checked={settings.pollEnabled}
@@ -236,7 +269,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
                   disabled={busy}
                 />
               </label>
-              <label className="checkbox-label">
+              <label className="checkbox-label automation-choice">
                 <input
                   type="checkbox"
                   checked={settings.autoPricingEnabled}
@@ -251,7 +284,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
                 />
                 Allow independently approved automatic pricing rules
               </label>
-              <label className="checkbox-label">
+              <label className="checkbox-label automation-choice">
                 <input
                   type="checkbox"
                   checked={settings.autoDeliveryEnabled}
@@ -269,7 +302,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
               </label>
               {(settings.autoPricingEnabled ||
                 settings.autoDeliveryEnabled) && (
-                <label className="checkbox-label">
+                <label className="checkbox-label automation-choice">
                   <input
                     type="checkbox"
                     checked={confirmed}
@@ -311,11 +344,16 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
           {notice}
         </p>
       )}
-      <section
-        className="data-panel settings-section"
-        style={{ marginTop: 24 }}
-      >
-        <h2>Saved pricing rules</h2>
+      <section className="data-panel settings-section automation-rules-panel">
+        <div className="automation-section-heading">
+          <span>
+            <SlidersHorizontal size={20} />
+          </span>
+          <div>
+            <small>YOUR RULEBOOK</small>
+            <h2>Saved pricing rules</h2>
+          </div>
+        </div>
         <p className="scope-note">
           Configure floors and simulate from a predefined offer&apos;s Edit /
           compare page. Automatic rules need a different MFA reviewer before the
@@ -372,6 +410,6 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
           </p>
         )}
       </section>
-    </>
+    </div>
   );
 }
