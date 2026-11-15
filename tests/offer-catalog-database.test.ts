@@ -54,6 +54,93 @@ afterAll(async () => {
   await db?.close();
 });
 
+it("refreshes delivery metadata only after an exact verified details outcome", async () => {
+  await db.exec("reset role");
+  const nativeId = offerId.replace("predefined:", ""),
+    operationId = "88888888-8888-4888-8888-888888888888",
+    document = {
+      details: {
+        description: "Synthetic product",
+        guaranteedDeliveryTime: "Hour1",
+        deliveryMethod: "InGameTrade",
+        pricing: {
+          quantity: 5,
+          minQuantity: 3,
+          volumeDiscounts: [],
+          pricePerUnit: { amount: 1.01, currency: "USD" },
+        },
+      },
+      augmentedGame: {
+        gameId: "fixture-game",
+        category: "TopUp",
+        tradeEnvironmentId: null,
+        offerAttributes: [],
+      },
+      giftCardDetails: null,
+    };
+  await db.query(
+    "insert into public.approval_requests(id,requester_id,approver_id,action,target_id,reason,status,idempotency_key,external_attempted,payload) values($1,$2,$3,'offers.create',$4,'Synthetic claimed details operation','executing',$1,true,$5)",
+    [
+      operationId,
+      owner,
+      viewer,
+      offerId,
+      JSON.stringify({
+        marketV1: true,
+        nativeId,
+        lockKey: "offer:" + nativeId,
+        change: { kind: "offer.details", body: document },
+        before: {},
+      }),
+    ],
+  );
+  const proof = {
+    id: nativeId,
+    verified: true,
+    state: "Active",
+    price: 1.01,
+    currency: "USD",
+    quantity: 5,
+    document,
+    context: { unitSystem: "Unit1" },
+  };
+  await expect(
+    db.query(
+      "select public.finish_marketplace_operation($1,'succeeded',$2,null)",
+      [
+        operationId,
+        JSON.stringify({
+          ...proof,
+          document: { ...document, giftCardDetails: [] },
+        }),
+      ],
+    ),
+  ).rejects.toThrow("Desired outcome");
+  await db.query(
+    "select public.finish_marketplace_operation($1,'succeeded',$2,null)",
+    [operationId, JSON.stringify(proof)],
+  );
+  const row = (
+    await db.query<{
+      min_quantity: number;
+      delivery_time: string;
+      delivery_method: string;
+      unit_system: string;
+    }>(
+      "select min_quantity,delivery_time,delivery_method,unit_system from public.offers where id=$1",
+      [offerId],
+    )
+  ).rows[0];
+  expect(Number(row.min_quantity)).toBe(3);
+  expect(row.delivery_time).toBe("Hour1");
+  expect(row.delivery_method).toBe("InGameTrade");
+  expect(row.unit_system).toBe("Unit1");
+  await db.query(
+    "update public.offers set state='Active',quantity=5,updated_at=$2 where id=$1",
+    [offerId, stamp],
+  );
+});
+
 it("saves auditable local labels without changing upstream state, stock or read timestamp", async () => {
   await identity();
   await db.query(

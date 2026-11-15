@@ -13,6 +13,8 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     testTimeout: 30000,
+    // Embedded PostgreSQL cold starts apply the complete migration history.
+    hookTimeout: 30000,
     pool: "forks",
     maxWorkers: 2,
   },

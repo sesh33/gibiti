@@ -75,17 +75,18 @@ The targeted changes above were implemented while retaining the existing
 layout, styles, MFA and independently reviewed operation flow. Discounts whose
 funding or effect on proceeds is unknown also block repricing. Cost authority
 is bound to a fingerprint of the actual game/package/delivery context; a
-changed product requires new Owner verification. Direct price/detail tickets
+changed product requires new Owner verification. Verified details outcomes refresh catalog delivery promises and minimum
+quantities without waiting for another manual synchronization. Direct price/detail tickets
 and batch previews also enforce configured current economic floors. Changes
 to minimum order quantities or discount tiers require a new cost review.
 
-Final local checks: 397 unit, route and SQL tests passed; four opt-in live-read
+Final local checks: 398 unit, route and SQL tests passed; four opt-in live-read
 tests were skipped because the Production Seller connection is unavailable.
 ESLint, TypeScript and the Webpack production build passed. Browser automation
 was not used. No Eldorado offer/order mutation was executed.
 
-The four forward migrations `202611150024` through `202611150027` were applied
-transactionally to the hosted database, bringing its recorded count to 25.
+The five forward migrations `202611150024` through `202611150028` were applied
+transactionally to the hosted database, bringing its recorded count to 26.
 Post-migration inspection confirmed all automation switches remained off,
 the single existing scheduler job remained active, and staff cannot insert or
 forge pricing execution evidence. No Vercel environment variable was changed.
