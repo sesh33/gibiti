@@ -11,6 +11,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { AppError } from "@/lib/errors";
 import type { requireStaff } from "@/domains/authentication/session";
+import { checkEconomics } from "@/domains/pricing/economics";
 const choice = z.discriminatedUnion("kind", [
   z
     .object({
@@ -79,7 +80,7 @@ export async function buildBatchPreview(
     );
   const { data: policies, error: policyError } = await supabaseAdmin()
     .from("repricing_policies")
-    .select("native_id,floor,currency")
+    .select("native_id,floor,currency,economics")
     .in(
       "native_id",
       records.map((record) => record.native_id),
@@ -144,15 +145,26 @@ export async function buildBatchPreview(
           : change.kind === "offer.details"
             ? change.body.details.pricing.pricePerUnit
             : null;
+      let effectiveFloor = floor ? Number(floor.floor) : null;
+      if (floor && money && floor.economics != null) {
+        const economics = checkEconomics(floor.economics);
+        if (!economics.ok)
+          throw new AppError(
+            "BATCH_ECONOMICS_UNVERIFIED",
+            economics.reason,
+            409,
+          );
+        effectiveFloor = Math.max(Number(floor.floor), economics.economicFloor);
+      }
       if (
         floor &&
         money &&
         (money.currency !== floor.currency ||
-          money.amount < Number(floor.floor))
+          money.amount < (effectiveFloor ?? 0))
       )
         throw new AppError(
           "BATCH_FLOOR_VIOLATION",
-          "The requested change violates this listing's saved floor or currency.",
+          "The requested change violates this listing's saved price floor, current economic floor or currency.",
           409,
         );
       return {
@@ -161,7 +173,7 @@ export async function buildBatchPreview(
         expectedSnapshot: record.updated_at,
         before,
         change,
-        floor: floor ? Number(floor.floor) : null,
+        floor: effectiveFloor,
       };
     }),
   );

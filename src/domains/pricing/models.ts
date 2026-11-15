@@ -1,5 +1,31 @@
 import { z } from "zod";
 import { currencies } from "@/domains/eldorado/contracts";
+export const economicsInput = z
+  .object({
+    unitCost: z.number().finite().min(0).max(1e12),
+    feePercent: z.number().finite().min(0).max(99.99),
+    fixedFee: z.number().finite().min(0).max(1e12),
+    comparisonQuantity: z.number().int().min(1).max(2147483647),
+    minMarginPercent: z.number().finite().min(0).max(99.99),
+    verifiedAt: z.iso.datetime({ offset: true }),
+    validUntil: z.iso.datetime({ offset: true }),
+  })
+  .strict()
+  .refine(
+    (input) => input.feePercent + input.minMarginPercent < 100,
+    "Fees and minimum margin must leave a positive contribution to costs.",
+  )
+  .refine(
+    (input) => Date.parse(input.validUntil) > Date.parse(input.verifiedAt),
+    "The estimate must expire after its verification time.",
+  )
+  .refine(
+    (input) =>
+      Date.parse(input.validUntil) - Date.parse(input.verifiedAt) <=
+      30 * 86400_000,
+    "Cost and fee verification is valid for at most 30 days.",
+  );
+export type PricingEconomics = z.infer<typeof economicsInput>;
 export const policyInput = z
   .object({
     offerId: z.string().regex(/^predefined:[0-9a-f-]{36}$/i),
@@ -9,6 +35,7 @@ export const policyInput = z
     mode: z.enum(["simulation", "manual", "automatic"]).default("simulation"),
     intervalSeconds: z.number().int().min(15).max(86400).default(15),
     confirmAutomatic: z.boolean().default(false),
+    economics: economicsInput.nullable().default(null),
   })
   .strict()
   .refine(
@@ -34,6 +61,8 @@ export type PricingPolicy = {
   last_checked_at: string | null;
   last_error_code: string | null;
   next_run_at: string;
+  economics?: PricingEconomics | null;
+  economics_context_hash?: string | null;
 };
 export type PricingQuote = {
   id: string;

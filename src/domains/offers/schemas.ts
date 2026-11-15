@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AppError } from "@/lib/errors";
 
 import type { OfferSource } from "./definitions";
+import { selectPublicContextEntries, type PublicOfferContext } from "./catalog";
 const amount = z.object({
   amount: z.number().finite(),
   currency: z.string().regex(/^[A-Z]{3}$/),
@@ -16,6 +17,14 @@ export const sellerOfferSchema = z.object({
   offerState: z.string(),
   quantity: z.number().finite().nonnegative().nullable().optional(),
   pricePerUnit: amount.nullable().optional(),
+  gameCategoryTitle: z.string().max(500).nullish(),
+  minQuantity: z.number().finite().nonnegative().nullish(),
+  unitSystem: z.string().max(100).nullish(),
+  guaranteedDeliveryTime: z.string().max(100).nullish(),
+  deliveryMethod: z.string().max(100).nullish(),
+  attributes: z.array(z.unknown()).nullish(),
+  tradeEnvironmentValues: z.array(z.unknown()).nullish(),
+  offerAttributeIdValues: z.array(z.unknown()).nullish(),
 });
 export const sellerOfferPageSchema = z.object({
   pageIndex: z.number().int().nonnegative(),
@@ -38,6 +47,16 @@ export type OfferRecord = {
   quantity: number | null;
   game_id: string | null;
   updated_at: string;
+  game_category_title?: string | null;
+  min_quantity?: number | null;
+  unit_system?: string | null;
+  delivery_time?: string | null;
+  delivery_method?: string | null;
+  public_context?: PublicOfferContext;
+  catalog_region?: string | null;
+  catalog_platform?: string | null;
+  catalog_denomination?: string | null;
+  catalog_tagged_at?: string | null;
 };
 export function parseSellerOfferPage(data: unknown): SellerOfferPage {
   const parsed = sellerOfferPageSchema.safeParse(data);
@@ -68,5 +87,19 @@ export function normalizeOffer(
     quantity: offer.quantity ?? null,
     game_id: offer.gameId ?? null,
     updated_at: syncedAt,
+    game_category_title: offer.gameCategoryTitle ?? null,
+    min_quantity: offer.minQuantity ?? null,
+    unit_system: offer.unitSystem ?? null,
+    delivery_time: offer.guaranteedDeliveryTime ?? null,
+    delivery_method: offer.deliveryMethod ?? null,
+    public_context: {
+      attributes: selectPublicContextEntries(offer.attributes ?? []),
+      tradeEnvironmentValues: selectPublicContextEntries(
+        offer.tradeEnvironmentValues ?? [],
+      ),
+      offerAttributeIdValues: selectPublicContextEntries(
+        offer.offerAttributeIdValues ?? [],
+      ),
+    },
   };
 }

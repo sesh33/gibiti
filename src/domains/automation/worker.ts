@@ -10,11 +10,8 @@ import {
   type MarketTicket,
   type OperationDependencies,
 } from "@/domains/eldorado/operations";
-import {
-  buildPricingQuote,
-  persistQuote,
-  validateQuoteBeforeWrite,
-} from "@/domains/pricing/quotes";
+import { buildPricingQuote, persistQuote } from "@/domains/pricing/quotes";
+import { pricingValidation } from "@/domains/eldorado/pricing-validation";
 import type { PricingPolicy } from "@/domains/pricing/models";
 import { AppError } from "@/lib/errors";
 
@@ -161,13 +158,13 @@ function automatedDependencies(
   plan: Plan,
 ): OperationDependencies {
   const admin = supabaseAdmin(),
-    client = eldoradoClient();
+    client = eldoradoClient(),
+    pricing = pricingValidation(ticket.id, ticket.repricing_quote_id, admin);
   return {
     current: (change, id) => readMarketCurrent(change, id, client),
     ...(ticket.repricing_quote_id
       ? {
-          validateQuote: () =>
-            validateQuoteBeforeWrite(ticket.repricing_quote_id!),
+          validateQuote: pricing.verify,
         }
       : {}),
     async claim() {
@@ -195,6 +192,7 @@ function automatedDependencies(
             "Automatic authority was revoked or expired. No marketplace request was sent.",
             409,
           );
+        pricing.beforeSend();
       }),
     async finish(outcome, proof, code) {
       const { data, error } = await admin.rpc("finish_marketplace_operation", {

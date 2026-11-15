@@ -151,6 +151,11 @@ export function OfferBatchCenter({ configured }: { configured: boolean }) {
         title="More listings. The same control."
         description="Prepare up to 10 predefined listings together, inspect every proposed value and create independent review requests. Previewing sends no marketplace change."
       >
+        {me.data?.permissions.includes("offers.create") && (
+          <Link href="/offers/import" className="empty-link">
+            Import new listings →
+          </Link>
+        )}
         <Link href="/offers" className="empty-link">
           Back to catalog →
         </Link>
@@ -364,7 +369,7 @@ export function OfferBatchCenter({ configured }: { configured: boolean }) {
                       <th>Current price</th>
                       <th>Current stock</th>
                       <th>Proposed value</th>
-                      <th>Saved price floor</th>
+                      <th>Applicable price floor</th>
                     </tr>
                   </thead>
                   <tbody>

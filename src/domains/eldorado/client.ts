@@ -240,7 +240,9 @@ export class EldoradoClient {
         if (!response.ok) {
           await this.discard(response);
           throw new AppError(
-            "ELDORADO_AUTH_FAILED",
+            response.status === 401 || response.status === 403
+              ? "ELDORADO_AUTH_REJECTED"
+              : "ELDORADO_AUTH_FAILED",
             `Eldorado authentication returned HTTP ${response.status}.`,
             502,
           );
@@ -331,7 +333,15 @@ export class EldoradoClient {
       if (!response.ok) {
         await this.discard(response);
         throw new AppError(
-          "ELDORADO_REQUEST_FAILED",
+          response.status === 401
+            ? "ELDORADO_ACCESS_EXPIRED"
+            : response.status === 403
+              ? "ELDORADO_ACCESS_DENIED"
+              : response.status === 404
+                ? "ELDORADO_READ_NOT_FOUND"
+                : response.status >= 500
+                  ? "ELDORADO_SERVICE_UNAVAILABLE"
+                  : "ELDORADO_REQUEST_FAILED",
           `Eldorado read returned HTTP ${response.status}.`,
           502,
         );
@@ -692,6 +702,8 @@ export class EldoradoClient {
             offerState: z.string(),
             userId: z.string().optional(),
             pricePerUnit: price,
+            pricePerUnitWithDiscount: z.unknown().optional(),
+            discountPercentage: z.unknown().optional(),
             quantity: z.number().nonnegative(),
             gameId: z.string(),
             category: z.string(),
@@ -740,12 +752,31 @@ export class EldoradoClient {
           offer.tradeEnvironmentValues,
           offer.offerAttributeIdValues,
         ].every((value) => !value?.length);
+      const discountedPrice = price.safeParse(offer.pricePerUnitWithDiscount),
+        discountPercent = z
+          .number()
+          .finite()
+          .min(0)
+          .max(100)
+          .safeParse(offer.discountPercentage);
       return {
         id: offer.id,
         sellerId: offer.userId ?? null,
         state: offer.offerState,
         price: offer.pricePerUnit.amount,
         currency: offer.pricePerUnit.currency,
+        discount: {
+          pricePerUnitWithDiscount: discountedPrice.success
+            ? discountedPrice.data
+            : null,
+          discountPercentage: discountPercent.success
+            ? discountPercent.data
+            : null,
+          unverified:
+            (offer.pricePerUnitWithDiscount != null &&
+              !discountedPrice.success) ||
+            (offer.discountPercentage != null && !discountPercent.success),
+        },
         quantity: offer.quantity,
         gameId: offer.gameId,
         category: offer.category,

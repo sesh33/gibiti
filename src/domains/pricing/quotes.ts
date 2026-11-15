@@ -6,19 +6,61 @@ import { eldoradoClient, type EldoradoClient } from "@/domains/eldorado/client";
 import {
   comparableOffer,
   comparableContext,
+  hasUnverifiedDiscount,
 } from "@/domains/offers/comparison";
 import { AppError } from "@/lib/errors";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { moneyInput } from "@/domains/eldorado/contracts";
-import type { PricingPolicy, PricingQuote } from "./models";
+import {
+  economicsInput,
+  type PricingPolicy,
+  type PricingQuote,
+} from "./models";
+import {
+  checkEconomics,
+  clockToleranceMs,
+  estimateEconomics,
+} from "./economics";
 
 // This is an application request budget, not a claimed marketplace quota.
 const maxPages = 5;
+export const maxMarketAgeMs = 60_000;
 const competitor = comparableOffer.extend({
   userId: z.string(),
   guaranteedDeliveryTime: z.string(),
   volumeDiscounts: z.array(z.json()),
 });
+export function pricingContextHash(
+  own: Pick<
+    Awaited<ReturnType<EldoradoClient["predefinedSnapshot"]>>,
+    "gameId" | "category" | "currency" | "context" | "details"
+  >,
+) {
+  function canonical(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === "object")
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, entry]) => [key, canonical(entry)]),
+      );
+    return value;
+  }
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        canonical({
+          gameId: own.gameId,
+          category: own.category,
+          currency: own.currency,
+          context: own.context,
+          delivery: own.details?.guaranteedDeliveryTime,
+          volumeDiscounts: own.details?.pricing.volumeDiscounts,
+        }),
+      ),
+    )
+    .digest("hex");
+}
 function equivalent(
   own: Awaited<ReturnType<EldoradoClient["predefinedSnapshot"]>>,
   candidate: z.infer<typeof competitor>,
@@ -66,8 +108,16 @@ export function choosePrice(
 export async function buildPricingQuote(
   policy: PricingPolicy,
   client = eldoradoClient(),
+  now: () => number = Date.now,
 ) {
+  const collectionStarted = now();
   const own = await client.predefinedSnapshot(policy.native_id);
+  if (own.category === "TopUp")
+    throw new AppError(
+      "TOPUP_COMPARISON_UNVERIFIED",
+      "Top-up repricing is blocked until authoritative region, platform and denomination mappings are verified. Local catalog tags do not authorize matching; edit the offer manually with review.",
+      409,
+    );
   if (
     !own.contextComplete ||
     !own.sellerId ||
@@ -82,7 +132,33 @@ export async function buildPricingQuote(
       "The own listing must be active, in stock and have complete package, currency and delivery metadata.",
       409,
     );
-  const candidates: number[] = [];
+  if (
+    own.discount?.unverified ||
+    hasUnverifiedDiscount({
+      pricePerUnit: { amount: own.price, currency: own.currency },
+      ...own.discount,
+    })
+  )
+    throw new AppError(
+      "DISCOUNT_REVIEW_REQUIRED",
+      "The listing has discounted or unverified pricing. Review the discount manually; its funding and effect on seller proceeds cannot be assumed. No repricing is allowed.",
+      409,
+    );
+  const economics = checkEconomics(policy.economics, now()),
+    savedEconomics = economicsInput.safeParse(policy.economics),
+    comparisonQuantity = savedEconomics.success
+      ? savedEconomics.data.comparisonQuantity
+      : own.details.pricing.minQuantity;
+  if (
+    comparisonQuantity < own.details.pricing.minQuantity ||
+    own.quantity < comparisonQuantity
+  )
+    throw new AppError(
+      "COMPARISON_QUANTITY_UNAVAILABLE",
+      "The comparison quantity must meet the listing minimum and be available in stock.",
+      409,
+    );
+  const candidates: { id: string; amount: number }[] = [];
   let totalPages = 1,
     ambiguous = 0;
   const seen = new Set<string>();
@@ -139,7 +215,11 @@ export async function buildPricingQuote(
         ambiguous++;
         continue;
       }
-      if (parsed.data.quantity < parsed.data.minQuantity) continue;
+      if (
+        parsed.data.quantity < parsed.data.minQuantity ||
+        parsed.data.quantity < comparisonQuantity
+      )
+        continue;
       const row = parsed.data,
         key = row.id.toLowerCase();
       if (seen.has(key))
@@ -149,13 +229,16 @@ export async function buildPricingQuote(
           409,
         );
       seen.add(key);
-      if (equivalent(own, row)) candidates.push(row.pricePerUnit.amount);
+      if (equivalent(own, row)) {
+        if (hasUnverifiedDiscount(row)) ambiguous++;
+        else candidates.push({ id: row.id, amount: row.pricePerUnit.amount });
+      }
     }
   }
   if (ambiguous)
     throw new AppError(
       "COMPARISON_AMBIGUOUS",
-      "Some active offers have incomplete comparison metadata. No recommendation or write is allowed.",
+      "Some active offers have incomplete comparison metadata or unverified discounted pricing. Review discounts manually; no recommendation or write is allowed.",
       409,
     );
   if (!candidates.length)
@@ -164,10 +247,24 @@ export async function buildPricingQuote(
       "No fully equivalent active competitor was verified. No recommendation or write is allowed.",
       409,
     );
-  const minimum = Math.min(...candidates),
+  const observed = now();
+  if (
+    observed - collectionStarted >= maxMarketAgeMs ||
+    collectionStarted > observed
+  )
+    throw new AppError(
+      "COMPARISON_STALE",
+      "The market read exceeded its freshness window. Check the market again; no write is allowed.",
+      409,
+    );
+  const effectiveFloor = Math.max(
+      Number(policy.floor),
+      economics.ok ? economics.economicFloor : 0,
+    ),
+    minimum = Math.min(...candidates.map((candidate) => candidate.amount)),
     amount = choosePrice(
       minimum,
-      Number(policy.floor),
+      effectiveFloor,
       Number(policy.difference),
       policy.decimals,
     );
@@ -177,6 +274,42 @@ export async function buildPricingQuote(
       "The computed price or currency is outside the supplied write contract. No write is allowed.",
       409,
     );
+  const estimate = economics.ok
+      ? estimateEconomics(economics.basis, amount)
+      : null,
+    currentEconomics = checkEconomics(policy.economics, observed);
+  let blockedReason: string | null = !currentEconomics.ok
+    ? currentEconomics.reason
+    : null;
+  if (
+    policy.economics &&
+    policy.economics_context_hash !== pricingContextHash(own)
+  )
+    blockedReason =
+      "The product, package or delivery context changed since cost verification. The Owner must verify costs and save this policy again.";
+  if (own.details.pricing.volumeDiscounts.length)
+    blockedReason =
+      "Volume discounts need a tier-specific margin review. This simulation cannot authorize repricing.";
+  if (
+    economics.ok &&
+    economics.basis.fixedFee > 0 &&
+    comparisonQuantity !== own.details.pricing.minQuantity
+  )
+    blockedReason =
+      "A fixed basket fee must be estimated at the listing's minimum purchase quantity to protect smaller orders. Set the comparison quantity to that minimum.";
+  if (
+    estimate &&
+    (!Object.values(estimate)
+      .filter((value) => typeof value === "number")
+      .every(Number.isFinite) ||
+      estimate.marginPercent + 1e-9 < estimate.basis.minMarginPercent)
+  )
+    blockedReason =
+      "The estimated margin could not be proven above the saved minimum.";
+  const validUntil = Math.min(
+    collectionStarted + maxMarketAgeMs,
+    economics.ok ? Date.parse(economics.basis.validUntil) : Infinity,
+  );
   return {
     amount,
     currency: own.currency,
@@ -185,6 +318,7 @@ export async function buildPricingQuote(
       complete: true,
       pages: totalPages,
       equivalentOffers: candidates.length,
+      observedOffers: candidates,
       minimum,
       position:
         amount < minimum
@@ -193,11 +327,17 @@ export async function buildPricingQuote(
             ? "matched"
             : "floor_limited",
       configuredFloor: Number(policy.floor),
+      effectiveFloor,
+      executable: blockedReason === null,
+      blockedReason,
+      comparisonQuantity,
+      collectionStartedAt: new Date(collectionStarted).toISOString(),
+      observedAt: new Date(observed).toISOString(),
+      validUntil: new Date(validUntil).toISOString(),
+      economics: estimate,
       difference: Number(policy.difference),
       decimals: policy.decimals,
-      contextHash: createHash("sha256")
-        .update(JSON.stringify(own.context))
-        .digest("hex"),
+      contextHash: pricingContextHash(own),
       policyVersion: policy.version,
     },
   };
@@ -228,8 +368,59 @@ export async function persistQuote(
     );
   return data as PricingQuote;
 }
-export async function validateQuoteBeforeWrite(id: string) {
-  const admin = supabaseAdmin();
+export function pricingFreshnessGuard(
+  proof: Record<string, unknown>,
+  quoteExpiresAt: string,
+  now: () => number = Date.now,
+) {
+  return () => {
+    const clock = now(),
+      started = Date.parse(String(proof.collectionStartedAt)),
+      observed = Date.parse(String(proof.observedAt)),
+      expiry = Date.parse(String(proof.validUntil)),
+      quoteExpiry = Date.parse(quoteExpiresAt);
+    if (!Number.isFinite(quoteExpiry) || quoteExpiry <= clock)
+      throw new AppError(
+        "QUOTE_EXPIRED",
+        "The approved quote expired. Simulate and review a new request.",
+        409,
+      );
+    if (
+      ![clock, started, observed, expiry].every(Number.isFinite) ||
+      started > clock + clockToleranceMs ||
+      observed > clock + clockToleranceMs ||
+      observed < started ||
+      observed - started > maxMarketAgeMs ||
+      clock - started >= maxMarketAgeMs ||
+      expiry > started + maxMarketAgeMs ||
+      expiry <= clock
+    )
+      throw new AppError(
+        "COMPARISON_STALE",
+        "The verified market data expired before sending. No price change is allowed.",
+        409,
+      );
+    if (proof.executable !== true)
+      throw new AppError(
+        "ECONOMICS_BLOCKED",
+        typeof proof.blockedReason === "string"
+          ? proof.blockedReason
+          : "Complete, current cost and fee estimates are required before execution.",
+        409,
+      );
+  };
+}
+
+export async function validateQuoteBeforeWrite(
+  id: string,
+  dependencies: {
+    admin?: ReturnType<typeof supabaseAdmin>;
+    client?: EldoradoClient;
+    now?: () => number;
+  } = {},
+) {
+  const admin = dependencies.admin ?? supabaseAdmin(),
+    now = dependencies.now ?? Date.now;
   const { data: quote, error } = await admin
     .from("repricing_quotes")
     .select("*")
@@ -239,6 +430,23 @@ export async function validateQuoteBeforeWrite(id: string) {
     throw new AppError(
       "QUOTE_NOT_FOUND",
       "The approved price simulation could not be loaded.",
+      409,
+    );
+  // The approved lifecycle has a strict expiry even if a later market happens
+  // to return the same amount. Refreshing never extends human authority.
+  if (
+    !Number.isFinite(Date.parse(quote.expires_at)) ||
+    Date.parse(quote.expires_at) <= now()
+  )
+    throw new AppError(
+      "QUOTE_EXPIRED",
+      "The approved quote expired. Simulate and review a new request.",
+      409,
+    );
+  if (quote.proof?.executable !== true)
+    throw new AppError(
+      "ECONOMICS_BLOCKED",
+      "The approved simulation did not authorize repricing. Verify cost and fee estimates, then simulate again.",
       409,
     );
   const { data: policy } = await admin
@@ -252,7 +460,13 @@ export async function validateQuoteBeforeWrite(id: string) {
       "The pricing policy changed. Simulate and review a new request.",
       409,
     );
-  const fresh = await buildPricingQuote(policy as PricingPolicy);
+  const fresh = await buildPricingQuote(
+    policy as PricingPolicy,
+    dependencies.client ?? eldoradoClient(),
+    now,
+  );
+  const assertFresh = pricingFreshnessGuard(fresh.proof, quote.expires_at, now);
+  assertFresh();
   if (
     fresh.amount !== Number(quote.amount) ||
     fresh.currency !== quote.currency ||
@@ -263,4 +477,5 @@ export async function validateQuoteBeforeWrite(id: string) {
       "The listing or market changed. Simulate and review a new request.",
       409,
     );
+  return { assertFresh, proof: fresh.proof };
 }

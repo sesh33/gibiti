@@ -3,6 +3,11 @@ import { requireStaff } from "@/domains/authentication/session";
 import { workspacePreferenceInput } from "@/domains/pricing/models";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sellerConnectionStatus } from "@/domains/eldorado/credentials";
+import {
+  integrationIssue,
+  schedulerHealth,
+  type AutomationRuntimeHealth,
+} from "@/domains/eldorado/integration-health";
 import { requireSameOrigin, readBody } from "@/lib/http";
 import { AppError, errorResponse } from "@/lib/errors";
 export async function GET() {
@@ -21,30 +26,46 @@ export async function GET() {
         "Workspace preferences could not be loaded.",
         503,
       );
-    let runtime = null;
+    let runtime: AutomationRuntimeHealth | null = null;
+    let runtimeAccess: "authorized" | "restricted" | "unavailable" =
+      "restricted";
     if (
       staff.permissions.has("settings.manage") ||
       staff.permissions.has("offers.update_price")
     ) {
-      const result = await supabaseAdmin()
-        .from("automation_runtime")
-        .select(
-          "scheduler_configured,last_heartbeat_at,last_poll_at,last_error_code,backoff_until",
-        )
-        .eq("id", true)
-        .single();
-      if (!result.error) runtime = result.data;
+      const result = await supabaseAdmin().rpc("integration_runtime_health");
+      runtimeAccess =
+        result.error || !result.data ? "unavailable" : "authorized";
+      if (runtimeAccess === "authorized") {
+        runtime = result.data as AutomationRuntimeHealth;
+        if (runtime.last_error_code)
+          runtime.last_error_code = integrationIssue(
+            runtime.last_error_code,
+          ).code;
+      }
     }
     const connection = await sellerConnectionStatus();
+    const settings = {
+      pollEnabled: data.poll_enabled,
+      pollSeconds: data.poll_seconds,
+      autoDeliveryEnabled: data.auto_delivery_enabled,
+      autoPricingEnabled: data.auto_pricing_enabled,
+    };
     return NextResponse.json(
       {
-        settings: {
-          pollEnabled: data.poll_enabled,
-          pollSeconds: data.poll_seconds,
-          autoDeliveryEnabled: data.auto_delivery_enabled,
-          autoPricingEnabled: data.auto_pricing_enabled,
-        },
+        settings,
         runtime,
+        runtimeAccess,
+        scheduler:
+          runtimeAccess === "restricted"
+            ? {
+                status: "restricted",
+                label: "Details restricted",
+                action:
+                  "Scheduler diagnostics require settings or price-management permission.",
+              }
+            : schedulerHealth(runtime, settings),
+        checkedAt: new Date().toISOString(),
         connection: {
           configured: connection.configured,
           verifiedAt: connection.verifiedAt,

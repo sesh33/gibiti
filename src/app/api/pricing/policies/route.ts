@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/domains/authentication/session";
 import { policyInput } from "@/domains/pricing/models";
+import { pricingContextHash } from "@/domains/pricing/quotes";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { eldoradoClient } from "@/domains/eldorado/client";
 import { requireSameOrigin, readBody } from "@/lib/http";
@@ -66,6 +67,10 @@ export async function POST(request: Request) {
       desired_mode: input.mode,
       seconds: input.intervalSeconds,
       activation_confirmed: input.confirmAutomatic,
+      desired_economics: input.economics,
+      desired_context_hash: input.economics
+        ? pricingContextHash(snapshot)
+        : null,
     });
     if (error)
       throw new AppError(

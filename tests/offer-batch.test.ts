@@ -139,3 +139,44 @@ it("rejects duplicate selection, denied permissions and missing local snapshots 
   );
   expect(mocked.snapshot).not.toHaveBeenCalled();
 });
+it("enforces current economic assumptions in previews and blocks expired assumptions", async () => {
+  const economics = {
+    unitCost: 2,
+    feePercent: 10,
+    fixedFee: 0,
+    comparisonQuantity: 1,
+    minMarginPercent: 10,
+    verifiedAt: new Date(Date.now() - 1000).toISOString(),
+    validUntil: new Date(Date.now() + 60000).toISOString(),
+  };
+  mocked.policies.mockResolvedValue({
+    data: [{ native_id: ids[0], floor: 1.5, currency: "USD", economics }],
+    error: null,
+  });
+  const protectedPreview = await buildBatchPreview(input, staff(), client);
+  expect(protectedPreview.valid).toBe(false);
+  expect(protectedPreview.problems[0].code).toBe("BATCH_FLOOR_VIOLATION");
+  expect(mocked.insert).not.toHaveBeenCalled();
+  mocked.policies.mockResolvedValue({
+    data: [
+      {
+        native_id: ids[0],
+        floor: 1.5,
+        currency: "USD",
+        economics: {
+          ...economics,
+          validUntil: new Date(Date.now() - 1).toISOString(),
+        },
+      },
+    ],
+    error: null,
+  });
+  const expired = await buildBatchPreview(
+    { ...input, change: { kind: "price", amount: 5, currency: "USD" } },
+    staff(),
+    client,
+  );
+  expect(expired.valid).toBe(false);
+  expect(expired.problems[0].code).toBe("BATCH_ECONOMICS_UNVERIFIED");
+  expect(mocked.insert).not.toHaveBeenCalled();
+});

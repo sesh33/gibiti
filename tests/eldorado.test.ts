@@ -245,7 +245,68 @@ it("does not repeatedly refresh after a second 401", async () => {
       return new Response(null, { status: 401 });
     },
   );
-  await expect(client.orders()).rejects.toThrow("HTTP 401");
+  await expect(client.orders()).rejects.toMatchObject({
+    code: "ELDORADO_ACCESS_EXPIRED",
+    status: 502,
+    message: "Eldorado read returned HTTP 401.",
+  });
   expect(auth).toBe(2);
   expect(reads).toBe(2);
 });
+
+it.each([
+  [403, "ELDORADO_ACCESS_DENIED"],
+  [404, "ELDORADO_READ_NOT_FOUND"],
+  [500, "ELDORADO_SERVICE_UNAVAILABLE"],
+  [503, "ELDORADO_SERVICE_UNAVAILABLE"],
+  [400, "ELDORADO_REQUEST_FAILED"],
+] as const)(
+  "classifies HTTP %i reads without retrying or exposing provider diagnostics",
+  async (status, code) => {
+    let reads = 0;
+    const client = new EldoradoClient(
+      { clientId: "fixture", clientSecret: "fixture" },
+      async (input) => {
+        if (String(input).endsWith("/token"))
+          return Response.json({ accessToken: "fixture", expiresIn: 900 });
+        reads++;
+        return new Response("private-provider-body", { status });
+      },
+    );
+    const error = await client.orders().catch((failure: unknown) => failure);
+    expect(error).toMatchObject({
+      code,
+      status: 502,
+      message: `Eldorado read returned HTTP ${status}.`,
+    });
+    expect(String(error)).not.toContain("private-provider-body");
+    expect(reads).toBe(1);
+  },
+);
+
+it.each([
+  [401, "ELDORADO_AUTH_REJECTED"],
+  [403, "ELDORADO_AUTH_REJECTED"],
+  [400, "ELDORADO_AUTH_FAILED"],
+  [500, "ELDORADO_AUTH_FAILED"],
+] as const)(
+  "classifies HTTP %i token failures without retrying or exposing response bodies",
+  async (status, code) => {
+    let requests = 0;
+    const client = new EldoradoClient(
+      { clientId: "fixture", clientSecret: "fixture" },
+      async () => {
+        requests++;
+        return new Response("private-token-response", { status });
+      },
+    );
+    const error = await client.orders().catch((failure: unknown) => failure);
+    expect(error).toMatchObject({
+      code,
+      status: 502,
+      message: `Eldorado authentication returned HTTP ${status}.`,
+    });
+    expect(String(error)).not.toContain("private-token-response");
+    expect(requests).toBe(1);
+  },
+);

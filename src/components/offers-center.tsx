@@ -31,11 +31,24 @@ import {
   type OfferSource,
 } from "@/domains/offers/definitions";
 import type { OfferRecord } from "@/domains/offers/schemas";
+import {
+  catalogReadIsRecent,
+  catalogStockLabel,
+} from "@/domains/offers/catalog";
+import { deliveryTimes } from "@/domains/eldorado/contracts";
 type ReadPage = {
   items: OfferRecord[];
   nextCursor: string | null;
   sync: { provider: string; last_success_at: string | null; scope: string }[];
   scope: string;
+  facets: {
+    categories: string[];
+    games: string[];
+    states: string[];
+    regions: string[];
+    platforms: string[];
+    denominations: string[];
+  };
 };
 type SyncResult =
   | {
@@ -118,6 +131,10 @@ export function OffersCenter({ configured }: { configured: boolean }) {
     [selected, setSelected] = useState<OfferRecord | null>(null),
     [reason, setReason] = useState(""),
     [confirmed, setConfirmed] = useState(false),
+    [tagged, setTagged] = useState<OfferRecord | null>(null),
+    [tags, setTags] = useState({ region: "", platform: "", denomination: "" }),
+    [tagBusy, setTagBusy] = useState(false),
+    [tagMessage, setTagMessage] = useState(""),
     [attempts, setAttempts] = useState<Record<string, AvailabilityAttempt>>({});
   const writesInFlight = useRef(new Set<string>());
   const source = params.get("source") ?? "all",
@@ -185,6 +202,32 @@ export function OffersCenter({ configured }: { configured: boolean }) {
     else next.delete(name);
     if (name !== "cursor") next.delete("cursor");
     router.push(`${pathname}?${next}`);
+  }
+  async function saveTags(event: React.FormEvent) {
+    event.preventDefault();
+    if (!tagged || tagBusy) return;
+    setTagBusy(true);
+    setTagMessage("");
+    try {
+      const result = await api<{ message: string }>(
+        "/api/offers/catalog-tags",
+        {
+          method: "POST",
+          body: JSON.stringify({ offerId: tagged.id, ...tags }),
+        },
+      );
+      setFeedback(result.message);
+      setTagged(null);
+      cache.invalidateQueries({ queryKey: ["offers"] });
+    } catch (error) {
+      setTagMessage(
+        error instanceof Error
+          ? error.message
+          : "The labels could not be saved.",
+      );
+    } finally {
+      setTagBusy(false);
+    }
   }
   function latestAttempt(offerId: string) {
     const nativeId = query.data?.items.find(
@@ -362,7 +405,31 @@ export function OffersCenter({ configured }: { configured: boolean }) {
     }
   }
   const rows = query.data?.items ?? [];
-  const states = [...new Set(rows.map((row) => row.state))].sort();
+  const states =
+    query.data?.facets?.states ??
+    [...new Set(rows.map((row) => row.state))].sort();
+  function facet(name: string, label: string, options: readonly string[]) {
+    const current = params.get(name) ?? "";
+    return (
+      <label className="select-label" key={name}>
+        {label}
+        <select
+          aria-label={`Filter ${label.toLowerCase()}`}
+          value={current}
+          onChange={(event) => update(name, event.target.value)}
+        >
+          <option value="">All</option>
+          {[...new Set([...(current ? [current] : []), ...options])].map(
+            (value) => (
+              <option value={value} key={value}>
+                {value}
+              </option>
+            ),
+          )}
+        </select>
+      </label>
+    );
+  }
   const selectedAttempt = selected ? latestAttempt(selected.id) : undefined,
     selectedAction = selected ? actionForState(selected.state) : null,
     pendingOperations = history.data?.items.filter((operation) =>
@@ -373,13 +440,21 @@ export function OffersCenter({ configured }: { configured: boolean }) {
       <PageHeading
         eyebrow="LISTING OPERATIONS"
         title="Offers, without the clutter."
-        description="Your real listings, with controlled availability changes and a record of every action."
+        description="A focused catalog for top-ups and every listing category, with stock, delivery and reviewed changes in one workspace."
       >
         {access.data?.permissions.includes("offers.create") && (
-          <Button asChild>
-            <Link href="/offers/edit">Create predefined offer</Link>
-          </Button>
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/offers/import">Import & preview</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/offers/edit">Create predefined offer</Link>
+            </Button>
+          </>
         )}
+        <Button variant="outline" asChild>
+          <Link href="/offers/batch">Batch workbench</Link>
+        </Button>
         <Button
           variant="outline"
           disabled={!configured || synchronize.isPending}
@@ -406,8 +481,8 @@ export function OffersCenter({ configured }: { configured: boolean }) {
             ? "Pause or resume one verified listing at a time. Changes are sent to Eldorado only after your confirmation and recorded for audit."
             : "Read your authorized listing inventory. Availability changes require a separate staff permission."}{" "}
           Predefined price, quantity and details are available through Edit /
-          compare with independent review. Deletion and bulk changes are
-          disabled.
+          compare with independent review. The batch workbench prepares selected
+          changes for separate approval; previewing never changes Eldorado.
         </span>
       </div>
       {(source === "all" || source === "predefined") && (
@@ -445,7 +520,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
             <strong>
               {rows.filter((offer) => offer.state === "Active").length}
             </strong>
-            <small>Available in the last verified read</small>
+            <small>Marketplace state; verify stock and read age</small>
           </div>
           <div>
             <span>
@@ -566,7 +641,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
             <button type="submit">Search</button>
           </form>
           <label className="select-label">
-            Type
+            Source
             <select
               aria-label="Filter offer type"
               value={source}
@@ -597,7 +672,102 @@ export function OffersCenter({ configured }: { configured: boolean }) {
               )}
             </select>
           </label>
+          <Button
+            size="sm"
+            variant={params.get("category") === "TopUp" ? "default" : "outline"}
+            onClick={() =>
+              update(
+                "category",
+                params.get("category") === "TopUp" ? "" : "TopUp",
+              )
+            }
+          >
+            Top-ups
+          </Button>
         </div>
+        <details
+          open={Boolean(
+            [
+              "category",
+              "game",
+              "region",
+              "platform",
+              "denomination",
+              "delivery",
+              "stock",
+              "freshness",
+            ].some((key) => params.get(key)),
+          )}
+        >
+          <summary
+            className="scope-note"
+            style={{ cursor: "pointer", padding: "12px 17px" }}
+          >
+            Catalog filters · game, local region, platform, denomination,
+            delivery and stock
+          </summary>
+          <div className="table-toolbar">
+            {facet(
+              "category",
+              "Category",
+              query.data?.facets?.categories ?? [],
+            )}
+            {facet("game", "Game ID", query.data?.facets?.games ?? [])}
+            {facet("region", "Local region", query.data?.facets?.regions ?? [])}
+            {facet(
+              "platform",
+              "Local platform",
+              query.data?.facets?.platforms ?? [],
+            )}
+            {facet(
+              "denomination",
+              "Local denomination",
+              query.data?.facets?.denominations ?? [],
+            )}
+            {facet("delivery", "Delivery time", deliveryTimes)}
+            <label className="select-label">
+              Stock
+              <select
+                aria-label="Filter stock"
+                value={params.get("stock") ?? ""}
+                onChange={(event) => update("stock", event.target.value)}
+              >
+                <option value="">All</option>
+                <option value="positive">Quantity above zero</option>
+                <option value="empty">Out of stock</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </label>
+            <label className="select-label">
+              Read age
+              <select
+                aria-label="Filter read age"
+                value={params.get("freshness") ?? ""}
+                onChange={(event) => update("freshness", event.target.value)}
+              >
+                <option value="">All</option>
+                <option value="recent">Within 15 minutes</option>
+                <option value="stale">Older than 15 minutes</option>
+              </select>
+            </label>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch("");
+                router.push(pathname);
+              }}
+            >
+              Clear filters
+            </Button>
+          </div>
+          <p className="scope-note" style={{ padding: "0 17px 12px" }}>
+            Region, platform and denomination labels belong to this workspace.
+            They do not modify Eldorado attributes or qualify products for
+            automatic repricing. Facets cover synchronized records, with up to
+            200 values per field.
+          </p>
+        </details>
         {query.isError ? (
           <QueryError
             message={query.error.message}
@@ -615,7 +785,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                     <th>Type / Game</th>
                     <th>Status</th>
                     <th>Unit price</th>
-                    <th>Available</th>
+                    <th>Stock / delivery</th>
                     <th>Last read</th>
                     <th>Listing controls</th>
                   </tr>
@@ -634,8 +804,30 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                           <small className="mono">{offer.native_id}</small>
                         </td>
                         <td>
-                          {sourceLabels[offer.source] ?? offer.category}
-                          <small>{offer.game_id ?? "Game not provided"}</small>
+                          {offer.category}
+                          <small>
+                            {offer.game_category_title ??
+                              offer.game_id ??
+                              "Game not provided"}
+                          </small>
+                          <small>{sourceLabels[offer.source]}</small>
+                          <small>
+                            {[
+                              offer.catalog_region,
+                              offer.catalog_platform,
+                              offer.catalog_denomination,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") ||
+                              "Region / platform / denomination unclassified"}
+                          </small>
+                          {(offer.catalog_region ||
+                            offer.catalog_platform ||
+                            offer.catalog_denomination) && (
+                            <small>
+                              Local labels · not verified product attributes
+                            </small>
+                          )}
                         </td>
                         <td>
                           <span
@@ -649,9 +841,25 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                             ? unitPrice(Number(offer.price), offer.currency)
                             : "Not provided"}
                         </td>
-                        <td>{offer.quantity ?? "Not provided"}</td>
+                        <td>
+                          {offer.quantity ?? "Not provided"}
+                          <small>{catalogStockLabel(offer)}</small>
+                          <small>
+                            Minimum: {offer.min_quantity ?? "unknown"} ·{" "}
+                            {offer.unit_system ?? "unit unknown"}
+                          </small>
+                          <small>
+                            {offer.delivery_time ?? "Delivery time unknown"} ·{" "}
+                            {offer.delivery_method ?? "method unknown"}
+                          </small>
+                        </td>
                         <td>
                           {new Date(offer.updated_at).toLocaleString("en-US")}
+                          <small>
+                            {catalogReadIsRecent(offer.updated_at)
+                              ? "Read within 15 minutes"
+                              : "Stale snapshot · synchronize before relying on it"}
+                          </small>
                         </td>
                         <td className="catalog-control-cell">
                           {offer.source === "predefined" && (
@@ -661,6 +869,26 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                             >
                               Edit / compare
                             </Link>
+                          )}
+                          {access.data?.permissions.includes(
+                            "offers.create",
+                          ) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setTagged(offer);
+                                setTags({
+                                  region: offer.catalog_region ?? "",
+                                  platform: offer.catalog_platform ?? "",
+                                  denomination:
+                                    offer.catalog_denomination ?? "",
+                                });
+                                setTagMessage("");
+                              }}
+                            >
+                              Local labels
+                            </Button>
                           )}
                           {canManage ? (
                             <>
@@ -769,6 +997,45 @@ export function OffersCenter({ configured }: { configured: boolean }) {
         that coverage cannot be changed here. Sources may overlap: record counts
         do not represent a unique listing total.
       </p>
+      <Dialog
+        open={Boolean(tagged)}
+        onOpenChange={(open) => {
+          if (!open && !tagBusy) setTagged(null);
+        }}
+      >
+        <DialogContent>
+          <DialogTitle>Organize this listing locally</DialogTitle>
+          <DialogDescription>
+            Labels help your team filter {tagged?.title}. These labels do not
+            change Eldorado, certify product attributes or authorize repricing.
+            Saving requires catalog editing permission and MFA.
+          </DialogDescription>
+          <form onSubmit={saveTags} className="catalog-editor-form">
+            {(["region", "platform", "denomination"] as const).map((key) => (
+              <label className="field-label" key={key}>
+                Local {key}
+                <input
+                  maxLength={100}
+                  value={tags[key]}
+                  disabled={tagBusy}
+                  onChange={(event) =>
+                    setTags({ ...tags, [key]: event.target.value })
+                  }
+                  placeholder={
+                    key === "denomination"
+                      ? "e.g. 1000 diamonds (operator label)"
+                      : `Enter the ${key} used by your team`
+                  }
+                />
+              </label>
+            ))}
+            {tagMessage && <p role="alert">{tagMessage}</p>}
+            <Button type="submit" disabled={tagBusy}>
+              {tagBusy ? "Saving labels…" : "Save local labels"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={Boolean(selected)}
         onOpenChange={(open) => {

@@ -12,6 +12,35 @@ const owner = "11111111-1111-4111-8111-111111111111",
 let counter = 0;
 const key = () =>
   "77777777-7777-4777-8777-" + String(++counter).padStart(12, "0");
+function economics(overrides: Record<string, unknown> = {}) {
+  return {
+    unitCost: 0.5,
+    feePercent: 10,
+    fixedFee: 0,
+    comparisonQuantity: 1,
+    minMarginPercent: 10,
+    verifiedAt: new Date().toISOString(),
+    validUntil: new Date(Date.now() + 86400000).toISOString(),
+    ...overrides,
+  };
+}
+function marketProof(
+  policy: Record<string, unknown>,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    complete: true,
+    executable: true,
+    equivalentOffers: 1,
+    minimum: 2,
+    policyVersion: policy.version,
+    contextHash: policy.economics_context_hash,
+    collectionStartedAt: new Date().toISOString(),
+    observedAt: new Date().toISOString(),
+    validUntil: new Date(Date.now() + 55000).toISOString(),
+    ...overrides,
+  };
+}
 async function identity(id = owner, aal = "aal2") {
   await db.exec("reset role");
   await db.query("select set_config('request.jwt.claims',$1,false)", [
@@ -82,10 +111,18 @@ async function rule(
   mode = "simulation",
   floor = 1.5,
   confirm = mode === "automatic",
+  assumptions: Record<string, unknown> | null = economics(),
 ) {
   const result = await db.query<{ policy: Record<string, unknown> }>(
-    "select public.save_repricing_policy($1,$2,0.02,2,$3,300,$4) as policy",
-    ["predefined:" + native, floor, mode, confirm],
+    "select public.save_repricing_policy($1,$2,0.02,2,$3,300,$4,$5,$6) as policy",
+    [
+      "predefined:" + native,
+      floor,
+      mode,
+      confirm,
+      assumptions ? JSON.stringify(assumptions) : null,
+      assumptions ? "a".repeat(64) : null,
+    ],
   );
   return result.rows[0].policy;
 }
@@ -110,11 +147,15 @@ async function workspace(
     confirm,
   ]);
 }
-async function quote(policy: Record<string, unknown>, amount = 1.8) {
+async function quote(
+  policy: Record<string, unknown>,
+  amount = 1.8,
+  evidence = marketProof(policy),
+) {
   await root();
   const id = key();
   await db.query(
-    "insert into public.repricing_quotes(id,policy_id,policy_version,requested_by,amount,currency,before_snapshot,proof) values($1,$2,$3,$4,$5,'USD',$6,'{\"complete\":true}')",
+    "insert into public.repricing_quotes(id,policy_id,policy_version,requested_by,amount,currency,before_snapshot,proof) values($1,$2,$3,$4,$5,'USD',$6,$7)",
     [
       id,
       policy.id,
@@ -128,6 +169,7 @@ async function quote(policy: Record<string, unknown>, amount = 1.8) {
         currency: "USD",
         quantity: 10,
       }),
+      JSON.stringify(evidence),
     ],
   );
   return id;
@@ -227,11 +269,9 @@ it("persists private per-user read preferences and enforces scope", async () => 
 it("enforces the floor on ordinary price and full-details requests", async () => {
   const id = await listing();
   await rule(id);
-  await expect(priceRequest(id, 1.49)).rejects.toThrow(
-    "configured currency or floor",
-  );
+  await expect(priceRequest(id, 1.49)).rejects.toThrow("configured currency");
   await expect(priceRequest(id, 1.49, "offer.details")).rejects.toThrow(
-    "configured currency or floor",
+    "configured currency",
   );
   await expect(
     db.query(
@@ -247,7 +287,7 @@ it("enforces the floor on ordinary price and full-details requests", async () =>
         key(),
       ],
     ),
-  ).rejects.toThrow("configured currency or floor");
+  ).rejects.toThrow("configured currency");
 });
 it("requires explicit automatic activation and independent MFA review", async () => {
   const id = await listing();
@@ -338,6 +378,11 @@ it("only the hosted service can claim approved automatic tickets once", async ()
     db.query("select public.claim_marketplace_operation($1)", [ticket.id]),
   ).rejects.toThrow("hosted runner owns");
   await service();
+  await db.query("select public.record_repricing_validation($1,$2,$3)", [
+    ticket.id,
+    qid,
+    JSON.stringify(marketProof(policy)),
+  ]);
   await db.query("select public.claim_automated_operation($1,$2)", [
     ticket.id,
     plan.lease,
@@ -531,6 +576,272 @@ it("leases and provider backoff survive invocations and cannot be shortened", as
     db.query("select public.defer_eldorado_requests(now())"),
   ).rejects.toThrow("permission denied");
 });
+it("requires complete current economics and rejects invalid assumptions through the public RPC", async () => {
+  const id = await listing();
+  for (const invalid of [
+    {},
+    economics({ unitCost: -1 }),
+    economics({ comparisonQuantity: 0 }),
+    economics({ comparisonQuantity: 1.5 }),
+    economics({ feePercent: 90, minMarginPercent: 10 }),
+    economics({ validUntil: new Date(Date.now() - 1000).toISOString() }),
+    economics({ verifiedAt: new Date(Date.now() + 60000).toISOString() }),
+    economics({
+      validUntil: new Date(Date.now() + 31 * 86400000).toISOString(),
+    }),
+    economics({ inventedFeeApi: true }),
+  ])
+    await expect(rule(id, "manual", 1, false, invalid)).rejects.toThrow(
+      "complete, current economics",
+    );
+  const policy = await rule(id, "manual", 1, false, null),
+    qid = await quote(policy);
+  await identity();
+  await expect(
+    db.query(
+      "select public.request_quoted_repricing($1,'Review complete quoted economics',$2)",
+      [qid, key()],
+    ),
+  ).rejects.toThrow("margin-protected simulation");
+});
+it("blocks a quote below its economic floor even when the configured floor is lower", async () => {
+  const id = await listing(),
+    policy = await rule(
+      id,
+      "manual",
+      1,
+      false,
+      economics({ unitCost: 2, fixedFee: 0.2 }),
+    ),
+    qid = await quote(policy, 1.8);
+  await identity();
+  await expect(
+    db.query(
+      "select public.request_quoted_repricing($1,'Review exact margin-protected price',$2)",
+      [qid, key()],
+    ),
+  ).rejects.toThrow("minimum margin");
+  await expect(priceRequest(id, 1.8)).rejects.toThrow("minimum margin");
+  await expect(priceRequest(id, 1.8, "offer.details")).rejects.toThrow(
+    "minimum margin",
+  );
+  await root();
+  expect(
+    (
+      await db.query<{ count: number }>(
+        "select count(*)::integer as count from public.approval_requests where repricing_quote_id=$1",
+        [qid],
+      )
+    ).rows[0].count,
+  ).toBe(0);
+});
+it("fails closed for stale financial assumptions and unverified top-up identity", async () => {
+  const id = await listing(),
+    policy = await rule(id, "manual"),
+    qid = await quote(policy);
+  await root();
+  await db.query(
+    "update public.repricing_policies set economics=$2 where id=$1",
+    [
+      policy.id,
+      JSON.stringify(
+        economics({ validUntil: new Date(Date.now() - 1000).toISOString() }),
+      ),
+    ],
+  );
+  await identity();
+  await expect(
+    db.query(
+      "select public.request_quoted_repricing($1,'Review exact current quoted price',$2)",
+      [qid, key()],
+    ),
+  ).rejects.toThrow("Refresh the configured cost");
+  await expect(priceRequest(id, 1.8)).rejects.toThrow(
+    "Refresh the configured cost",
+  );
+  await expect(priceRequest(id, 1.8, "offer.details")).rejects.toThrow(
+    "Refresh the configured cost",
+  );
+  await rule(id, "manual");
+  const updatedPolicy = (
+    await db.query<{ policy: Record<string, unknown> }>(
+      "select to_jsonb(p) as policy from public.repricing_policies p where offer_id=$1",
+      ["predefined:" + id],
+    )
+  ).rows[0].policy;
+  const topupQuote = await quote(updatedPolicy);
+  await root();
+  await db.query("update public.offers set category='TopUp' where id=$1", [
+    "predefined:" + id,
+  ]);
+  await identity();
+  await expect(
+    db.query(
+      "select public.request_quoted_repricing($1,'Review exact top-up package price',$2)",
+      [topupQuote, key()],
+    ),
+  ).rejects.toThrow("top-up equivalence");
+});
+it("versions changed economics and requires a new independent automatic review", async () => {
+  const id = await listing(),
+    original = await rule(id, "automatic");
+  await approve(original);
+  await workspace(false, false, true);
+  await service();
+  expect(
+    (
+      await db.query<{ ok: boolean }>(
+        "select public.automatic_policy_authorized($1,$2) as ok",
+        [original.id, original.version],
+      )
+    ).rows[0].ok,
+  ).toBe(true);
+  await identity();
+  const changed = await rule(
+    id,
+    "automatic",
+    1.5,
+    true,
+    economics({ unitCost: 0.75 }),
+  );
+  expect(changed.version).not.toBe(original.version);
+  expect(changed.approved_by).toBeNull();
+  expect(changed.review_status).toBe("pending");
+  await service();
+  expect(
+    (
+      await db.query<{ ok: boolean }>(
+        "select public.automatic_policy_authorized($1,$2) as ok",
+        [changed.id, changed.version],
+      )
+    ).rows[0].ok,
+  ).toBe(false);
+  await approve(changed);
+  await service();
+  expect(
+    (
+      await db.query<{ ok: boolean }>(
+        "select public.automatic_policy_authorized($1,$2) as ok",
+        [changed.id, changed.version],
+      )
+    ).rows[0].ok,
+  ).toBe(true);
+  await root();
+  await db.query(
+    "update public.repricing_policies set economics=$2 where id=$1",
+    [
+      changed.id,
+      JSON.stringify(
+        economics({ validUntil: new Date(Date.now() - 1000).toISOString() }),
+      ),
+    ],
+  );
+  await service();
+  expect(
+    (
+      await db.query<{ ok: boolean }>(
+        "select public.automatic_policy_authorized($1,$2) as ok",
+        [changed.id, changed.version],
+      )
+    ).rows[0].ok,
+  ).toBe(false);
+  await workspace();
+});
+it("rejects expired market evidence, requires a recorded fresh recheck, and rechecks current manual authority", async () => {
+  const id = await listing(),
+    policy = await rule(id, "manual"),
+    oldQuote = await quote(
+      policy,
+      1.8,
+      marketProof(policy, {
+        collectionStartedAt: new Date(Date.now() - 90000).toISOString(),
+        observedAt: new Date(Date.now() - 80000).toISOString(),
+        validUntil: new Date(Date.now() - 30000).toISOString(),
+      }),
+    );
+  await identity();
+  await expect(
+    db.query(
+      "select public.request_quoted_repricing($1,'Review exact simulated market price',$2)",
+      [oldQuote, key()],
+    ),
+  ).rejects.toThrow("expired or incomplete");
+  const qid = await quote(policy);
+  await identity();
+  const ticket = (
+    await db.query<{ id: string }>(
+      "select public.request_quoted_repricing($1,'Review exact simulated market price',$2) as id",
+      [qid, key()],
+    )
+  ).rows[0].id;
+  await identity(admin);
+  await db.query(
+    "select public.decide_approval($1,true,'Independent exact price review')",
+    [ticket],
+  );
+  await identity();
+  await expect(
+    db.query("select public.claim_marketplace_operation($1)", [ticket]),
+  ).rejects.toThrow("margin-protected simulation");
+  await service();
+  await db.query("select public.record_repricing_validation($1,$2,$3)", [
+    ticket,
+    qid,
+    JSON.stringify(marketProof(policy)),
+  ]);
+  await root();
+  await db.query(
+    "update public.repricing_execution_validations set evidence=$2 where operation_id=$1",
+    [
+      ticket,
+      JSON.stringify(
+        marketProof(policy, {
+          collectionStartedAt: new Date(Date.now() - 90000).toISOString(),
+          observedAt: new Date(Date.now() - 80000).toISOString(),
+          validUntil: new Date(Date.now() - 30000).toISOString(),
+        }),
+      ),
+    ],
+  );
+  await identity();
+  await expect(
+    db.query("select public.claim_marketplace_operation($1)", [ticket]),
+  ).rejects.toThrow("expired or incomplete");
+  await service();
+  await db.query("select public.record_repricing_validation($1,$2,$3)", [
+    ticket,
+    qid,
+    JSON.stringify(marketProof(policy)),
+  ]);
+  await identity();
+  await db.query("select public.claim_marketplace_operation($1)", [ticket]);
+  await identity(owner, "aal1");
+  await expect(
+    db.query("select public.assert_claimed_marketplace_authority($1)", [
+      ticket,
+    ]),
+  ).rejects.toThrow("Current MFA");
+  await identity();
+  await db.query("select public.assert_claimed_marketplace_authority($1)", [
+    ticket,
+  ]);
+  await root();
+  await db.query(
+    "insert into public.user_permission_overrides(user_id,permission,allowed) values($1,'offers.update_price',false)",
+    [admin],
+  );
+  await identity();
+  await expect(
+    db.query("select public.assert_claimed_marketplace_authority($1)", [
+      ticket,
+    ]),
+  ).rejects.toThrow("independent operation authority");
+  await root();
+  await db.query(
+    "delete from public.user_permission_overrides where user_id=$1 and permission='offers.update_price'",
+    [admin],
+  );
+});
 it("keeps worker state, shared backoff, verification and completion RPCs private", async () => {
   await root();
   for (const role of ["anon", "authenticated"]) {
@@ -540,8 +851,11 @@ it("keeps worker state, shared backoff, verification and completion RPCs private
       worker: boolean;
       complete: boolean;
       proof: boolean;
+      pricingEvidence: boolean;
+      pricingBase: boolean;
+      pricingEvidenceTable: boolean;
     }>(
-      `select has_table_privilege('${role}','public.automation_runtime','SELECT') as runtime,has_table_privilege('${role}','public.integration_rate_state','SELECT') as rate,has_function_privilege('${role}','public.claim_automated_operation(uuid,uuid)','EXECUTE') as worker,has_function_privilege('${role}','public.release_automation_tick(uuid,text,integer)','EXECUTE') as complete,has_function_privilege('${role}','public.verify_seller_connection(uuid,uuid,text)','EXECUTE') as proof`,
+      `select has_table_privilege('${role}','public.automation_runtime','SELECT') as runtime,has_table_privilege('${role}','public.integration_rate_state','SELECT') as rate,has_function_privilege('${role}','public.claim_automated_operation(uuid,uuid)','EXECUTE') as worker,has_function_privilege('${role}','public.release_automation_tick(uuid,text,integer)','EXECUTE') as complete,has_function_privilege('${role}','public.verify_seller_connection(uuid,uuid,text)','EXECUTE') as proof,has_function_privilege('${role}','public.record_repricing_validation(uuid,uuid,jsonb)','EXECUTE') as "pricingEvidence",has_function_privilege('${role}','public.save_repricing_policy_base(text,numeric,numeric,integer,text,integer,boolean)','EXECUTE') as "pricingBase",has_table_privilege('${role}','public.repricing_execution_validations','SELECT,INSERT,UPDATE,DELETE') as "pricingEvidenceTable"`,
     );
     expect(result.rows[0]).toEqual({
       runtime: false,
@@ -549,6 +863,9 @@ it("keeps worker state, shared backoff, verification and completion RPCs private
       worker: false,
       complete: false,
       proof: false,
+      pricingEvidence: false,
+      pricingBase: false,
+      pricingEvidenceTable: false,
     });
   }
 });

@@ -1,11 +1,33 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Zap } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { unitPrice } from "@/lib/utils";
 import type { PricingPolicy, PricingQuote } from "@/domains/pricing/models";
+function estimateValue(quote: PricingQuote, key: string) {
+  const value = quote.proof.economics;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const number = (value as Record<string, unknown>)[key];
+  return typeof number === "number" && Number.isFinite(number) ? number : null;
+}
+function observedAt(quote: PricingQuote) {
+  const value = quote.proof.observedAt;
+  return typeof value === "string" && Number.isFinite(Date.parse(value))
+    ? new Date(value).toLocaleString()
+    : "Not recorded";
+}
 export function RepricingMonitor({ configured }: { configured: boolean }) {
+  const [clock, setClock] = useState<number | null>(null);
+  useEffect(() => {
+    const first = setTimeout(() => setClock(Date.now()), 0),
+      timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, []);
   const me = useQuery({
     queryKey: ["me"],
     queryFn: () => api<{ permissions: string[] }>("/api/me"),
@@ -46,7 +68,7 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
         </strong>
         <span>Provider limits respected</span>
       </div>
-      <h2>Compete on price. Keep your floor.</h2>
+      <h2>Compete on price. Protect your margin.</h2>
       <p className="scope-note">
         Price checks can run at a 15-second minimum interval. Actual cadence
         depends on provider latency, queued listings and cooldowns.
@@ -58,7 +80,7 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
           <i>01</i> Verify equivalent offers
         </span>
         <span>
-          <i>02</i> Apply your floor & difference
+          <i>02</i> Check fees, margin & floor
         </span>
         <span>
           <i>03</i> Confirm the real outcome
@@ -82,7 +104,9 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
         For USD, <strong>$0.00001 = 0.001 cents</strong>. Set at least five
         decimal places to represent that difference. Listing prices and floors
         retain up to eight decimal places. Only equivalent in-stock competitors
-        count; unknown metadata blocks repricing.
+        count; unknown metadata blocks repricing. Valid Owner cost and fee
+        estimates are required before execution. They do not represent actual
+        settlement data from Eldorado.
       </p>
       {rules.isError && <p role="alert">{rules.error.message}</p>}
       {history.isError && <p role="alert">{history.error.message}</p>}
@@ -90,31 +114,63 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
         <table>
           <thead>
             <tr>
-              <th>Market check</th>
+              <th>Market collected</th>
               <th>Proposed unit price</th>
               <th>Lowest verified competitor</th>
-              <th>Floor used</th>
+              <th>Effective unit floor</th>
+              <th>Estimated basket fees</th>
+              <th>Estimated net revenue</th>
+              <th>Estimated margin</th>
               <th>Verified peers</th>
+              <th>Execution</th>
             </tr>
           </thead>
           <tbody>
-            {history.data?.items.slice(0, 8).map((quote) => (
-              <tr key={quote.id}>
-                <td>{new Date(quote.created_at).toLocaleString()}</td>
-                <td>{unitPrice(Number(quote.amount), quote.currency)}</td>
-                <td>
-                  {typeof quote.proof.minimum === "number"
-                    ? unitPrice(quote.proof.minimum, quote.currency)
-                    : "Not recorded"}
-                </td>
-                <td>
-                  {typeof quote.proof.configuredFloor === "number"
-                    ? unitPrice(quote.proof.configuredFloor, quote.currency)
-                    : "Not recorded"}
-                </td>
-                <td>{String(quote.proof.equivalentOffers ?? "Unknown")}</td>
-              </tr>
-            ))}
+            {history.data?.items.slice(0, 8).map((quote) => {
+              const fees = estimateValue(quote, "fees"),
+                net = estimateValue(quote, "netRevenue"),
+                margin = estimateValue(quote, "marginPercent"),
+                quantity = estimateValue(quote, "comparisonQuantity"),
+                fresh =
+                  clock !== null &&
+                  Date.parse(quote.expires_at) > clock &&
+                  typeof quote.proof.validUntil === "string" &&
+                  Date.parse(quote.proof.validUntil) > clock;
+              return (
+                <tr key={quote.id}>
+                  <td>{observedAt(quote)}</td>
+                  <td>{unitPrice(Number(quote.amount), quote.currency)}</td>
+                  <td>
+                    {typeof quote.proof.minimum === "number"
+                      ? unitPrice(quote.proof.minimum, quote.currency)
+                      : "Not recorded"}
+                  </td>
+                  <td>
+                    {typeof quote.proof.effectiveFloor === "number"
+                      ? unitPrice(quote.proof.effectiveFloor, quote.currency)
+                      : "Not recorded"}
+                  </td>
+                  <td>
+                    {fees === null
+                      ? "Assumptions required"
+                      : unitPrice(fees, quote.currency)}
+                    {quantity !== null && <small> · {quantity} units</small>}
+                  </td>
+                  <td>{net === null ? "—" : unitPrice(net, quote.currency)}</td>
+                  <td>{margin === null ? "—" : `${margin.toFixed(2)}%`}</td>
+                  <td>{String(quote.proof.equivalentOffers ?? "Unknown")}</td>
+                  <td>
+                    {quote.proof.executable !== true
+                      ? typeof quote.proof.blockedReason === "string"
+                        ? `Blocked: ${quote.proof.blockedReason}`
+                        : "Simulation only"
+                      : fresh
+                        ? "Fresh · policy checks apply"
+                        : "Expired · simulate again"}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

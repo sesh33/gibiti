@@ -6,7 +6,44 @@ import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { unitPrice } from "@/lib/utils";
-import type { PricingPolicy, PricingQuote } from "@/domains/pricing/models";
+import type {
+  PricingEconomics,
+  PricingPolicy,
+  PricingQuote,
+} from "@/domains/pricing/models";
+
+function localDateTime(value: string | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
+function observedTime(value: unknown) {
+  return typeof value === "string" && Number.isFinite(Date.parse(value))
+    ? new Date(value).toLocaleString()
+    : "Not recorded";
+}
+function quoteEstimates(proof: PricingQuote["proof"]) {
+  const value = proof.economics;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const estimate = value as Record<string, unknown>;
+  return {
+    fees: typeof estimate.fees === "number" ? estimate.fees : null,
+    netRevenue:
+      typeof estimate.netRevenue === "number" ? estimate.netRevenue : null,
+    profit: typeof estimate.profit === "number" ? estimate.profit : null,
+    marginPercent:
+      typeof estimate.marginPercent === "number"
+        ? estimate.marginPercent
+        : null,
+    quantity:
+      typeof estimate.comparisonQuantity === "number"
+        ? estimate.comparisonQuantity
+        : null,
+  };
+}
 
 export function PricingControls({
   offerId,
@@ -60,6 +97,13 @@ export function PricingControls({
     [decimals, setDecimals] = useState<number | null>(null),
     [mode, setMode] = useState<PricingPolicy["mode"] | null>(null),
     [interval, setCheckInterval] = useState<number | null>(null);
+  const [economicsEnabled, setEconomicsEnabled] = useState<boolean | null>(
+      null,
+    ),
+    [economicsDraft, setEconomicsDraft] = useState<
+      Partial<Record<keyof PricingEconomics, string>>
+    >({}),
+    [economicsConfirmed, setEconomicsConfirmed] = useState(false);
   const [confirmAuto, setConfirmAuto] = useState(false),
     [confirmed, setConfirmed] = useState(false),
     [busy, setBusy] = useState(false),
@@ -68,13 +112,56 @@ export function PricingControls({
     [reviewReason, setReviewReason] = useState(""),
     [freshQuote, setFreshQuote] = useState<PricingQuote | null>(null);
   const selectedMode = mode ?? policy?.mode ?? "simulation",
-    quote = freshQuote ?? history.data?.items[0];
+    quote = freshQuote ?? history.data?.items[0],
+    hasEconomics = economicsEnabled ?? !!policy?.economics;
+  function economicsValue(key: keyof PricingEconomics) {
+    if (economicsDraft[key] !== undefined) return economicsDraft[key];
+    const saved = policy?.economics?.[key];
+    return key === "verifiedAt" || key === "validUntil"
+      ? localDateTime(typeof saved === "string" ? saved : undefined)
+      : saved === undefined
+        ? ""
+        : String(saved);
+  }
+  function editEconomics(key: keyof PricingEconomics, value: string) {
+    setEconomicsDraft((previous) => ({ ...previous, [key]: value }));
+    setEconomicsConfirmed(false);
+    setConfirmAuto(false);
+  }
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || (hasEconomics && !economicsConfirmed)) return;
     setBusy(true);
     setNotice("");
     try {
+      if (
+        hasEconomics &&
+        (
+          [
+            "unitCost",
+            "feePercent",
+            "fixedFee",
+            "comparisonQuantity",
+            "minMarginPercent",
+            "verifiedAt",
+            "validUntil",
+          ] as const
+        ).some((key) => economicsValue(key).trim() === "")
+      )
+        throw new Error(
+          "Complete every cost and fee assumption, including explicit zero values.",
+        );
+      const economics: PricingEconomics | null = hasEconomics
+        ? {
+            unitCost: Number(economicsValue("unitCost")),
+            feePercent: Number(economicsValue("feePercent")),
+            fixedFee: Number(economicsValue("fixedFee")),
+            comparisonQuantity: Number(economicsValue("comparisonQuantity")),
+            minMarginPercent: Number(economicsValue("minMarginPercent")),
+            verifiedAt: new Date(economicsValue("verifiedAt")).toISOString(),
+            validUntil: new Date(economicsValue("validUntil")).toISOString(),
+          }
+        : null;
       await api("/api/pricing/policies", {
         method: "POST",
         body: JSON.stringify({
@@ -85,18 +172,20 @@ export function PricingControls({
           mode: selectedMode,
           intervalSeconds: interval ?? policy?.interval_seconds ?? 15,
           confirmAutomatic: confirmAuto,
+          economics,
         }),
       });
       setFreshQuote(null);
       setConfirmAuto(false);
       setConfirmed(false);
+      setEconomicsConfirmed(false);
       await cache.invalidateQueries({
         queryKey: ["pricing-policies", offerId],
       });
       setNotice(
         selectedMode === "automatic"
           ? "Rule saved. A different MFA reviewer must approve it, and the workspace automatic-pricing switch must be enabled."
-          : "Floor and pricing preferences saved in the database.",
+          : "Floor and pricing assumptions saved in the database.",
       );
     } catch (error) {
       setNotice(
@@ -136,7 +225,7 @@ export function PricingControls({
     }
   }
   async function request() {
-    if (!quote || busy) return;
+    if (!quote || busy || !executableQuote) return;
     requestKey.current ??= crypto.randomUUID();
     setBusy(true);
     setNotice("");
@@ -199,7 +288,11 @@ export function PricingControls({
     policy &&
     quote.policy_version === policy.version &&
     clock !== null &&
-    Date.parse(quote.expires_at) > clock;
+    Date.parse(quote.expires_at) > clock &&
+    typeof quote.proof.validUntil === "string" &&
+    Date.parse(quote.proof.validUntil) > clock;
+  const executableQuote = validQuote && quote?.proof.executable === true,
+    estimates = quote ? quoteEstimates(quote.proof) : null;
   return (
     <section
       className="data-panel settings-section full-width"
@@ -210,7 +303,7 @@ export function PricingControls({
           <ShieldCheck size={21} />
         </span>
         <div>
-          <h2>Pricing with a floor</h2>
+          <h2>Pricing with margin protection</h2>
           <p>
             Simulate first. Manual changes are reviewed; automation requires
             explicit, independently approved authority.
@@ -223,6 +316,14 @@ export function PricingControls({
           <div>
             <span>Saved minimum unit price</span>
             <strong>{unitPrice(Number(policy.floor), policy.currency)}</strong>
+          </div>
+          <div>
+            <span>Margin assumptions</span>
+            <strong>
+              {policy.economics
+                ? `Owner estimate · valid until ${observedTime(policy.economics.validUntil)}`
+                : "Missing — execution blocked"}
+            </strong>
           </div>
           <div>
             <span>Saved mode</span>
@@ -304,6 +405,150 @@ export function PricingControls({
               />
             </label>
           </div>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={hasEconomics}
+              onChange={(event) => {
+                setEconomicsEnabled(event.target.checked);
+                setEconomicsConfirmed(false);
+                setConfirmAuto(false);
+              }}
+              disabled={busy}
+            />
+            Configure cost, fees and minimum margin for this offer
+          </label>
+          <p className="scope-note">
+            These are your estimates in the listing currency (
+            {policy?.currency ?? "shown after saving"}), not fees or balances
+            supplied by Eldorado. An offer without valid assumptions can be
+            simulated but cannot be repriced. Margin means estimated profit
+            divided by gross revenue.
+          </p>
+          {hasEconomics && (
+            <>
+              <div className="reply-fields">
+                <label className="field-label">
+                  Cost per selling unit
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    max="1000000000000"
+                    step="any"
+                    value={economicsValue("unitCost")}
+                    onChange={(event) =>
+                      editEconomics("unitCost", event.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </label>
+                <label className="field-label">
+                  Estimated percentage fee (%)
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    max="99.99"
+                    step="any"
+                    value={economicsValue("feePercent")}
+                    onChange={(event) =>
+                      editEconomics("feePercent", event.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </label>
+                <label className="field-label">
+                  Estimated fixed fee per basket
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    max="1000000000000"
+                    step="any"
+                    value={economicsValue("fixedFee")}
+                    onChange={(event) =>
+                      editEconomics("fixedFee", event.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </label>
+                <label className="field-label">
+                  Basket quantity to compare
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    max="2147483647"
+                    step="1"
+                    value={economicsValue("comparisonQuantity")}
+                    onChange={(event) =>
+                      editEconomics("comparisonQuantity", event.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </label>
+                <label className="field-label">
+                  Minimum estimated margin (%)
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    max="99.99"
+                    step="any"
+                    value={economicsValue("minMarginPercent")}
+                    onChange={(event) =>
+                      editEconomics("minMarginPercent", event.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </label>
+                <label className="field-label">
+                  Assumptions last checked (local time)
+                  <input
+                    required
+                    type="datetime-local"
+                    value={economicsValue("verifiedAt")}
+                    onChange={(event) =>
+                      editEconomics("verifiedAt", event.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </label>
+                <label className="field-label">
+                  Assumptions valid until (local time)
+                  <input
+                    required
+                    type="datetime-local"
+                    value={economicsValue("validUntil")}
+                    onChange={(event) =>
+                      editEconomics("validUntil", event.target.value)
+                    }
+                    disabled={busy}
+                  />
+                </label>
+              </div>
+              <p className="scope-note">
+                The basket quantity is the amount bought, not the available
+                stock. Fixed fees apply once to that basket. Use the exact
+                selling unit from the listing and check the estimates before
+                they expire. Validity can cover at most 30 days from the last
+                check; percentage fees plus the minimum margin must total less
+                than 100%.
+              </p>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={economicsConfirmed}
+                  onChange={(event) =>
+                    setEconomicsConfirmed(event.target.checked)
+                  }
+                  disabled={busy}
+                />
+                I checked these cost and fee estimates in the listing currency.
+              </label>
+            </>
+          )}
           {selectedMode === "automatic" && (
             <label className="checkbox-label">
               <input
@@ -317,7 +562,11 @@ export function PricingControls({
             </label>
           )}
           <Button
-            disabled={busy || (selectedMode === "automatic" && !confirmAuto)}
+            disabled={
+              busy ||
+              (hasEconomics && !economicsConfirmed) ||
+              (selectedMode === "automatic" && !confirmAuto)
+            }
           >
             Save pricing rule
           </Button>
@@ -342,6 +591,11 @@ export function PricingControls({
             <p>
               Difference: {policy.difference} {policy.currency}; precision:{" "}
               {policy.decimals}; interval: {policy.interval_seconds}s.
+            </p>
+            <p className="scope-note">
+              {policy.economics
+                ? `Owner estimates: cost ${unitPrice(policy.economics.unitCost, policy.currency)} per unit; fee ${policy.economics.feePercent}% plus ${unitPrice(policy.economics.fixedFee, policy.currency)} per basket of ${policy.economics.comparisonQuantity}; minimum margin ${policy.economics.minMarginPercent}%. Checked ${observedTime(policy.economics.verifiedAt)}; valid until ${observedTime(policy.economics.validUntil)}.`
+                : "Cost and fee assumptions are missing. Execution remains blocked."}
             </p>
             <label className="field-label">
               Pricing review reason
@@ -390,6 +644,18 @@ export function PricingControls({
         <div>
           <div className="capability-list">
             <div>
+              <span>Lowest observed equivalent unit price</span>
+              <strong>
+                {typeof quote.proof.minimum === "number"
+                  ? unitPrice(quote.proof.minimum, quote.currency)
+                  : "Not recorded"}
+              </strong>
+            </div>
+            <div>
+              <span>Market collected</span>
+              <strong>{observedTime(quote.proof.observedAt)}</strong>
+            </div>
+            <div>
               <span>Simulated unit price</span>
               <strong>{unitPrice(Number(quote.amount), quote.currency)}</strong>
             </div>
@@ -403,11 +669,66 @@ export function PricingControls({
               <span>Quote status</span>
               <strong>
                 {validQuote
-                  ? "Fresh"
+                  ? quote.proof.executable === true
+                    ? "Fresh · safety checks passed"
+                    : "Simulation only · execution blocked"
                   : "Expired or policy changed — simulate again"}
               </strong>
             </div>
           </div>
+          <div className="capability-list">
+            <div>
+              <span>Effective minimum unit price</span>
+              <strong>
+                {typeof quote.proof.effectiveFloor === "number"
+                  ? unitPrice(quote.proof.effectiveFloor, quote.currency)
+                  : "Not recorded"}
+              </strong>
+            </div>
+            <div>
+              <span>Estimated basket fees</span>
+              <strong>
+                {estimates?.fees !== null && estimates?.fees !== undefined
+                  ? unitPrice(estimates.fees, quote.currency)
+                  : "Assumptions required"}
+              </strong>
+            </div>
+            <div>
+              <span>Estimated basket net revenue</span>
+              <strong>
+                {estimates?.netRevenue !== null &&
+                estimates?.netRevenue !== undefined
+                  ? unitPrice(estimates.netRevenue, quote.currency)
+                  : "Assumptions required"}
+              </strong>
+            </div>
+            <div>
+              <span>Estimated basket profit / margin</span>
+              <strong>
+                {estimates?.profit !== null &&
+                estimates?.profit !== undefined &&
+                estimates.marginPercent !== null
+                  ? `${unitPrice(estimates.profit, quote.currency)} / ${estimates.marginPercent.toFixed(2)}%`
+                  : "Assumptions required"}
+              </strong>
+            </div>
+          </div>
+          <p className="scope-note">
+            {estimates?.quantity
+              ? `Owner estimates for a basket of ${estimates.quantity} selling units. `
+              : "No verified financial assumptions are attached. "}
+            Market evidence is valid until{" "}
+            {observedTime(quote.proof.validUntil)}.
+          </p>
+          {quote.proof.executable !== true && (
+            <p role="status" className="inline-feedback">
+              Execution blocked:{" "}
+              {typeof quote.proof.blockedReason === "string"
+                ? quote.proof.blockedReason
+                : "valid cost, fee, margin and comparison evidence are required"}
+              .
+            </p>
+          )}
           {policy?.mode === "manual" && (
             <div className="catalog-editor-form">
               <label className="field-label">
@@ -430,7 +751,10 @@ export function PricingControls({
               </label>
               <Button
                 disabled={
-                  !validQuote || busy || !confirmed || reason.trim().length < 10
+                  !executableQuote ||
+                  busy ||
+                  !confirmed ||
+                  reason.trim().length < 10
                 }
                 onClick={request}
               >

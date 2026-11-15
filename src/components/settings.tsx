@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
@@ -18,6 +19,12 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { QueryError } from "@/components/empty-state";
 import { EldoradoConnection } from "@/components/eldorado-connection";
+import type {
+  AutomationRuntimeHealth,
+  IntegrationSnapshot,
+  SchedulerHealth,
+} from "@/domains/eldorado/integration-health";
+import { cooldownTime } from "@/domains/eldorado/integration-health";
 const required = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
@@ -39,15 +46,39 @@ export function Settings({ configured }: { configured: boolean }) {
         database: boolean;
         liveWrites: boolean;
         availabilityActions: boolean;
-        errors: { provider: string; code: string; created_at: string }[];
+        integration?: IntegrationSnapshot;
+        errors: {
+          provider: string;
+          code: string;
+          created_at: string;
+          title?: string;
+          action?: string;
+          resolved?: boolean;
+        }[];
       }>("/api/workspace/settings"),
     enabled: configured,
     refetchInterval: 60000,
     retry: false,
   });
-  const databaseVerified = status.data?.database === true;
-  const ordersVerified = status.data?.eldoradoVerified === true;
-  const offerSources = status.data?.offersVerifiedSources ?? [];
+  const scheduler = useQuery({
+    queryKey: ["automation-settings"],
+    queryFn: () =>
+      api<{
+        scheduler?: SchedulerHealth;
+        runtime: AutomationRuntimeHealth | null;
+        runtimeAccess?: string;
+        checkedAt?: string;
+      }>("/api/automation/settings"),
+    enabled: configured,
+    refetchInterval: 60000,
+    retry: false,
+  });
+  const databaseVerified = !status.isError && status.data?.database === true;
+  const ordersVerified =
+    !status.isError && status.data?.eldoradoVerified === true;
+  const offerSources = !status.isError
+    ? (status.data?.offersVerifiedSources ?? [])
+    : [];
   async function copy(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -65,8 +96,8 @@ export function Settings({ configured }: { configured: boolean }) {
       >
         <Button
           variant="outline"
-          onClick={() => status.refetch()}
-          disabled={!configured || status.isFetching}
+          onClick={() => Promise.all([status.refetch(), scheduler.refetch()])}
+          disabled={!configured || status.isFetching || scheduler.isFetching}
         >
           <RefreshCw size={14} className={status.isFetching ? "spin" : ""} />
           {status.isFetching ? "Refreshing..." : "Refresh status"}
@@ -102,7 +133,11 @@ export function Settings({ configured }: { configured: boolean }) {
             <span className={`status-dot ${ordersVerified ? "" : "amber"}`} />
             <span>Order synchronization</span>
             <strong>
-              {ordersVerified ? "Success recorded" : "Awaiting first sync"}
+              {status.isError
+                ? "Status unavailable"
+                : ordersVerified
+                  ? "Local page saved"
+                  : "Awaiting first sync"}
             </strong>
           </div>
           <div>
@@ -111,7 +146,7 @@ export function Settings({ configured }: { configured: boolean }) {
             />
             <span>Buyer messaging</span>
             <strong>
-              {status.data?.messaging ? "Connected" : "Authorization required"}
+              {status.data?.messaging ? "Connected" : "Manual replies"}
             </strong>
           </div>
         </div>
@@ -195,11 +230,13 @@ export function Settings({ configured }: { configured: boolean }) {
               <span
                 className={`pill ${ordersVerified ? "pill-blue" : "pill-amber"}`}
               >
-                {ordersVerified
-                  ? "Successful sync recorded"
-                  : status.data?.eldorado
-                    ? "Ready for first sync"
-                    : "Credentials required"}
+                {status.isError
+                  ? "Status unavailable"
+                  : ordersVerified
+                    ? "Local snapshot available"
+                    : status.data?.eldorado
+                      ? "Ready for first sync"
+                      : "Credentials required"}
               </span>
             </div>
             <div>
@@ -207,9 +244,11 @@ export function Settings({ configured }: { configured: boolean }) {
               <span
                 className={`pill ${offerSources.length ? "pill-blue" : "pill-muted"}`}
               >
-                {offerSources.length
-                  ? `${offerSources.length} verified ${offerSources.length === 1 ? "source" : "sources"}`
-                  : "Awaiting first sync"}
+                {status.isError
+                  ? "Status unavailable"
+                  : offerSources.length
+                    ? `${offerSources.length} saved ${offerSources.length === 1 ? "source" : "sources"}`
+                    : "Awaiting first sync"}
               </span>
             </div>
             <div>
@@ -227,7 +266,7 @@ export function Settings({ configured }: { configured: boolean }) {
               <span
                 className={`pill ${status.data?.availabilityActions ? "pill-blue" : "pill-muted"}`}
               >
-                {status.data?.availabilityActions
+                {!status.isError && status.data?.availabilityActions
                   ? "Available after synchronization"
                   : "Seller credentials required"}
               </span>
@@ -237,7 +276,7 @@ export function Settings({ configured }: { configured: boolean }) {
               <span
                 className={`pill ${status.data?.liveWrites ? "pill-blue" : "pill-muted"}`}
               >
-                {status.data?.liveWrites
+                {!status.isError && status.data?.liveWrites
                   ? "Approval and MFA required"
                   : "Connect Seller API"}
               </span>
@@ -258,6 +297,151 @@ export function Settings({ configured }: { configured: boolean }) {
               <ArrowUpRight size={13} />
             </a>
           </Button>
+        </section>
+        <section
+          className="data-panel settings-section full-width"
+          aria-label="Integration health"
+        >
+          <div className="settings-heading">
+            <span className="settings-icon">
+              <RefreshCw size={21} />
+            </span>
+            <div>
+              <h2>Integration health</h2>
+              <p>
+                Saved source pages, background processing and actions to resolve
+                errors.
+              </p>
+            </div>
+          </div>
+          <p className="scope-note">
+            These are local synchronization records, not a new live Eldorado
+            connection test or a complete account crawl. Use Connect Eldorado to
+            verify access; synchronize each source to refresh its data.
+            {status.data?.integration &&
+              !status.isError &&
+              ` History checked ${new Date(status.data.integration.checkedAt).toLocaleString("en-US")}.`}
+          </p>
+          {status.isError ? (
+            <QueryError message={status.error.message} />
+          ) : status.data?.integration ? (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Local status</th>
+                    <th>Last successful sync</th>
+                    <th>Coverage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {status.data.integration.sources.map((source) => (
+                    <tr key={source.provider}>
+                      <td>
+                        <strong>{source.label}</strong>
+                      </td>
+                      <td>
+                        <span
+                          className={`pill ${source.state === "saved" ? "pill-blue" : "pill-amber"}`}
+                        >
+                          {source.state === "saved"
+                            ? "Saved page"
+                            : source.state === "attention"
+                              ? "Needs attention"
+                              : "Not synchronized"}
+                        </span>
+                      </td>
+                      <td>
+                        {source.lastSuccessAt
+                          ? new Date(source.lastSuccessAt).toLocaleString(
+                              "en-US",
+                            )
+                          : "No successful sync recorded"}
+                      </td>
+                      <td>
+                        {source.lastSuccessAt
+                          ? source.page
+                            ? `Partial · page ${source.page.index} of ${source.page.totalPages} · ${source.page.recordCount} upstream records`
+                            : source.provider === "eldorado"
+                              ? `Partial · ${source.hasNextPage ? "more orders available" : "last page has no next cursor"}`
+                              : "Partial · page metadata unavailable"
+                          : "No saved coverage"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="scope-note">
+              {status.isFetching
+                ? "Checking saved synchronization history…"
+                : "Synchronization history is not available."}
+            </p>
+          )}
+          {!status.isError &&
+            status.data?.integration?.sources
+              .filter((source) => source.issue)
+              .map((source) => (
+                <p className="scope-note" key={source.provider}>
+                  <strong>
+                    {source.label}: {source.issue!.title}.
+                  </strong>{" "}
+                  {source.issue!.action}{" "}
+                  {source.lastErrorAt &&
+                    `Recorded ${new Date(source.lastErrorAt).toLocaleString("en-US")}.`}
+                </p>
+              ))}
+          <p className="scope-note">
+            Only predefined offers support the verified page selector. Other
+            offer adapters retain the verified initial-page scope.
+          </p>
+          <div className="capability-list">
+            <div>
+              <span>Background service</span>
+              <strong>
+                {scheduler.isError
+                  ? "Status unavailable"
+                  : (scheduler.data?.scheduler?.label ??
+                    (scheduler.isFetching ? "Checking" : "Not checked"))}
+              </strong>
+            </div>
+            {!scheduler.isError &&
+              scheduler.data?.runtime?.provider_backoff_until && (
+                <div>
+                  <span>Provider cooldown recorded until</span>
+                  <span>
+                    {cooldownTime(
+                      scheduler.data.runtime.provider_backoff_until,
+                    )}
+                  </span>
+                </div>
+              )}
+            <div>
+              <span>Last scheduler dispatch</span>
+              <span>
+                {scheduler.isError ||
+                scheduler.data?.runtimeAccess === "unavailable"
+                  ? "Status unavailable"
+                  : scheduler.data?.runtimeAccess === "restricted"
+                    ? "Details restricted"
+                    : scheduler.data?.runtime?.last_dispatch_at
+                      ? `${new Date(scheduler.data.runtime.last_dispatch_at).toLocaleString("en-US")} · ${scheduler.data.runtime.last_dispatch_status === null ? "transport result unavailable" : `HTTP ${scheduler.data.runtime.last_dispatch_status}`}`
+                      : "No dispatch recorded"}
+              </span>
+            </div>
+          </div>
+          {scheduler.isError ? (
+            <QueryError message={scheduler.error.message} />
+          ) : (
+            scheduler.data?.scheduler && (
+              <p className="scope-note">{scheduler.data.scheduler.action}</p>
+            )
+          )}
+          <Link href="/automation">
+            Open scheduler and automation controls →
+          </Link>
         </section>
         <section className="data-panel settings-section full-width">
           <div className="settings-heading">
@@ -353,15 +537,30 @@ export function Settings({ configured }: { configured: boolean }) {
           </div>
         </section>
       </div>
-      {status.isError && <QueryError message={status.error.message} />}{" "}
-      {status.data?.errors.length ? (
+      {!status.isError && status.data?.errors.length ? (
         <section className="data-panel settings-section">
           <h2>Recent integration errors</h2>
           {status.data.errors.map((error, index) => (
-            <p className="mono" key={index}>
-              {error.provider} · {error.code} ·{" "}
-              {new Date(error.created_at).toLocaleString("en-US")}
-            </p>
+            <article key={index} className="detail-section">
+              <strong>
+                {error.title ?? "Integration check needs attention"}
+              </strong>
+              <p className="mono">
+                {error.provider} · {error.code} ·{" "}
+                {new Date(error.created_at).toLocaleString("en-US")}
+              </p>
+              {error.resolved ? (
+                <p className="scope-note">
+                  A later successful source sync is recorded. This entry remains
+                  in the history.
+                </p>
+              ) : (
+                <p className="scope-note">
+                  {error.action ??
+                    "Review connection health before retrying a read. Check outcomes of uncertain operations before resubmission."}
+                </p>
+              )}
+            </article>
           ))}
         </section>
       ) : null}

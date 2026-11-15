@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { requireStaff } from "@/domains/authentication/session";
 import { calculateMetrics } from "@/domains/analytics/service";
 import { eldoradoConfigured } from "@/domains/eldorado/client";
+import {
+  integrationIssue,
+  integrationSnapshot,
+} from "@/domains/eldorado/integration-health";
 import { AppError, errorResponse } from "@/lib/errors";
 import type { Permission } from "@/domains/authorization/permissions";
 const resources: Record<
@@ -28,37 +32,64 @@ export async function GET(
     const { resource } = await params;
     if (resource === "settings") {
       const staff = await requireStaff("settings.manage");
-      const connected = await eldoradoConfigured();
-      const { data: errors } = await staff.db
-        .from("integration_errors")
-        .select("provider,code,created_at")
-        .order("created_at", { ascending: false })
-        .limit(10);
-      const { data: sync } = await staff.db
-        .from("integration_sync_state")
-        .select("provider,last_success_at");
+      const [connected, errorsResult, syncResult, latestErrorsResult] =
+        await Promise.all([
+          eldoradoConfigured(),
+          staff.db
+            .from("integration_errors")
+            .select("provider,code,created_at")
+            .order("created_at", { ascending: false })
+            .limit(25),
+          staff.db
+            .from("integration_sync_state")
+            .select("provider,last_success_at,cursor,scope"),
+          staff.db.rpc("integration_latest_errors"),
+        ]);
+      if (errorsResult.error || syncResult.error || latestErrorsResult.error)
+        throw new AppError(
+          "INTEGRATION_HEALTH_UNAVAILABLE",
+          "Integration history could not be checked. No healthy status was inferred. Ask an administrator to check database access and migrations.",
+          503,
+        );
+      const sync = syncResult.data ?? [],
+        errors = errorsResult.data ?? [],
+        integration = integrationSnapshot(sync, latestErrorsResult.data ?? []);
       return NextResponse.json(
         {
-          eldoradoVerified: Boolean(
-            sync?.some(
-              (item) => item.provider === "eldorado" && item.last_success_at,
-            ),
+          eldoradoVerified: integration.sources.some(
+            (item) => item.provider === "eldorado" && item.lastSuccessAt,
           ),
-          offersVerifiedSources:
-            sync
-              ?.filter(
-                (item) =>
-                  item.provider.startsWith("eldorado-offers:") &&
-                  item.last_success_at,
-              )
-              .map((item) => item.provider.replace("eldorado-offers:", "")) ??
-            [],
+          offersVerifiedSources: integration.sources
+            .filter(
+              (item) =>
+                item.provider.startsWith("eldorado-offers:") &&
+                item.lastSuccessAt,
+            )
+            .map((item) => item.provider.replace("eldorado-offers:", "")),
           eldorado: connected,
           messaging: false,
           database: true,
-          errors: errors ?? [],
+          errors: errors
+            .filter((error) =>
+              integration.sources.some(
+                (source) => source.provider === error.provider,
+              ),
+            )
+            .map((error) => ({
+              provider: error.provider,
+              created_at: error.created_at,
+              ...integrationIssue(error.code),
+              resolved: integration.sources.some(
+                (source) =>
+                  source.provider === error.provider &&
+                  source.lastSuccessAt !== null &&
+                  Date.parse(source.lastSuccessAt) >
+                    Date.parse(error.created_at),
+              ),
+            })),
           liveWrites: connected,
           availabilityActions: connected,
+          integration,
         },
         { headers: { "Cache-Control": "no-store" } },
       );

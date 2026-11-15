@@ -34,6 +34,16 @@ describe("verified seller offer read normalization", () => {
       quantity: 2,
       game_id: "fixture-game",
       updated_at: "2026-10-27T12:00:00Z",
+      game_category_title: null,
+      min_quantity: null,
+      unit_system: null,
+      delivery_time: null,
+      delivery_method: null,
+      public_context: {
+        attributes: [],
+        tradeEnvironmentValues: [],
+        offerAttributeIdValues: [],
+      },
     });
   });
   it("uses the listing reference when a predefined response has no title, without inventing product details", () => {
@@ -105,5 +115,55 @@ describe("verified seller offer read normalization", () => {
     expect(normalizeOffer(row, "flexible").id).not.toBe(
       normalizeOffer(row, "predefined").id,
     );
+  });
+  it("retains only documented public operational metadata without guessing top-up labels", () => {
+    const parsed = parseSellerOfferPage({
+      ...page,
+      results: [
+        {
+          ...offer,
+          category: "TopUp",
+          gameCategoryTitle: "Fixture game top-ups",
+          minQuantity: 5,
+          unitSystem: "Unit1000",
+          guaranteedDeliveryTime: "Minute20",
+          deliveryMethod: "InGameTrade",
+          attributes: [
+            {
+              id: "region-attribute",
+              name: "Region",
+              value: "Europe",
+              password: "private fixture",
+              nested: { token: "private fixture" },
+            },
+          ],
+          tradeEnvironmentValues: [{ id: "environment", values: ["PC", 123] }],
+          offerAttributeIdValues: [
+            { attributeId: "denomination", value: "1000" },
+          ],
+          giftCardDetails: [{ code: "private fixture" }],
+        },
+      ],
+    });
+    const record = normalizeOffer(parsed.results[0], "predefined");
+    expect(record).toMatchObject({
+      category: "TopUp",
+      min_quantity: 5,
+      unit_system: "Unit1000",
+      delivery_time: "Minute20",
+      delivery_method: "InGameTrade",
+      public_context: {
+        attributes: [
+          { id: "region-attribute", name: "Region", value: "Europe" },
+        ],
+        tradeEnvironmentValues: [{ id: "environment", values: ["PC"] }],
+        offerAttributeIdValues: [
+          { attributeId: "denomination", value: "1000" },
+        ],
+      },
+    });
+    expect(record.catalog_region).toBeUndefined();
+    expect(record.catalog_platform).toBeUndefined();
+    expect(JSON.stringify(record)).not.toContain("private fixture");
   });
 });

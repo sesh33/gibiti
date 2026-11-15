@@ -8,6 +8,11 @@ import { api } from "@/lib/api-client";
 import { unitPrice } from "@/lib/utils";
 import type { PricingPolicy } from "@/domains/pricing/models";
 import { RepricingMonitor } from "@/components/repricing-monitor";
+import type {
+  AutomationRuntimeHealth,
+  SchedulerHealth,
+} from "@/domains/eldorado/integration-health";
+import { cooldownTime } from "@/domains/eldorado/integration-health";
 type Settings = {
   pollEnabled: boolean;
   pollSeconds: number;
@@ -22,13 +27,10 @@ type State = {
     verifiedOnThisServer?: boolean;
   };
   settings: Settings;
-  runtime: {
-    scheduler_configured: boolean;
-    last_heartbeat_at: string | null;
-    last_poll_at: string | null;
-    last_error_code: string | null;
-    backoff_until: string | null;
-  } | null;
+  runtime: AutomationRuntimeHealth | null;
+  runtimeAccess?: "authorized" | "restricted" | "unavailable";
+  scheduler?: SchedulerHealth;
+  checkedAt?: string;
 };
 export function AutomationSettings({ configured }: { configured: boolean }) {
   const cache = useQueryClient(),
@@ -58,6 +60,8 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
     refetchInterval: 15000,
   });
   const owner = me.data?.profile.role === "OWNER",
+    runtime = state.isError ? null : state.data?.runtime,
+    scheduler = state.isError ? null : state.data?.scheduler,
     settings = {
       ...(state.data?.settings ?? {
         pollEnabled: false,
@@ -106,7 +110,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
           <h2>Workspace background service</h2>
           <p className="scope-note">
             Seller read verification:{" "}
-            {state.data?.connection?.verifiedOnThisServer
+            {!state.isError && state.data?.connection?.verifiedOnThisServer
               ? "verified on this server"
               : "Owner verification required in Settings"}
             .
@@ -115,47 +119,86 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
             <div>
               <span>Hosted scheduler</span>
               <strong>
-                {state.data?.runtime?.scheduler_configured
-                  ? "Configured"
-                  : "Not verified"}
+                {state.isError
+                  ? "Status unavailable"
+                  : (scheduler?.label ??
+                    (state.isFetching ? "Checking" : "Not checked"))}
               </strong>
             </div>
             <div>
               <span>Last worker heartbeat</span>
               <span>
-                {state.data?.runtime?.last_heartbeat_at
-                  ? new Date(
-                      state.data.runtime.last_heartbeat_at,
-                    ).toLocaleString()
-                  : "Not run yet"}
+                {runtime?.last_heartbeat_at
+                  ? new Date(runtime.last_heartbeat_at).toLocaleString()
+                  : state.isError || state.data?.runtimeAccess === "unavailable"
+                    ? "Status unavailable"
+                    : state.data?.runtimeAccess === "restricted"
+                      ? "Details restricted"
+                      : "No heartbeat recorded"}
               </span>
             </div>
             <div>
               <span>Last background order read</span>
               <span>
-                {state.data?.runtime?.last_poll_at
-                  ? new Date(state.data.runtime.last_poll_at).toLocaleString()
-                  : "Not run yet"}
+                {runtime?.last_poll_at
+                  ? new Date(runtime.last_poll_at).toLocaleString()
+                  : state.isError || state.data?.runtimeAccess === "unavailable"
+                    ? "Status unavailable"
+                    : state.data?.runtimeAccess === "restricted"
+                      ? "Details restricted"
+                      : "No background read recorded"}
               </span>
             </div>
             <div>
-              <span>Runner status</span>
+              <span>Last scheduler dispatch</span>
               <span>
-                {state.data?.runtime?.last_error_code ?? "No recorded error"}
+                {runtime?.last_dispatch_at
+                  ? `${new Date(runtime.last_dispatch_at).toLocaleString()} · ${runtime.last_dispatch_status === null ? "transport result unavailable" : `HTTP ${runtime.last_dispatch_status}`}`
+                  : state.isError || state.data?.runtimeAccess === "unavailable"
+                    ? "Status unavailable"
+                    : state.data?.runtimeAccess === "restricted"
+                      ? "Details restricted"
+                      : "No dispatch recorded"}
+              </span>
+            </div>
+            <div>
+              <span>Order catchup</span>
+              <span>
+                {runtime
+                  ? `${runtime.pending_backfill_pages} saved cursor ${runtime.pending_backfill_pages === 1 ? "task" : "tasks"}`
+                  : state.data?.runtimeAccess === "restricted"
+                    ? "Details restricted"
+                    : "Status unavailable"}
               </span>
             </div>
           </div>
-          {state.data?.runtime?.backoff_until && (
+          {scheduler && <p className="scope-note">{scheduler.action}</p>}
+          {runtime?.last_error_code && (
             <p className="scope-note">
-              Read backoff until {state.data.runtime.backoff_until}. The runner
+              Recorded code: <code>{runtime.last_error_code}</code>.
+            </p>
+          )}
+          {runtime?.provider_backoff_until && (
+            <p className="scope-note">
+              Provider request cooldown recorded until{" "}
+              {cooldownTime(runtime.provider_backoff_until)}. All Seller
+              requests share this cooldown.
+            </p>
+          )}
+          {runtime?.backoff_until && (
+            <p className="scope-note">
+              Read backoff until{" "}
+              {new Date(runtime.backoff_until).toLocaleString()}. The runner
               respects provider Retry-After and does not replay uncertain
               writes.
             </p>
           )}
           <p className="scope-note">
-            Runs through hosted server routes with database leases. Your browser
-            and computer can be closed. No marketplace session cookie or local
-            process is required.
+            Background work runs while your browser is closed. No new work is
+            dispatched when nothing is due; an older heartbeat can be normal.
+            {state.data?.checkedAt &&
+              !state.isError &&
+              ` Local runtime checked ${new Date(state.data.checkedAt).toLocaleString()}.`}
           </p>
           {state.isError && <p role="alert">{state.error.message}</p>}
         </section>

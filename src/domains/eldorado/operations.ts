@@ -12,7 +12,7 @@ import { requireStaff } from "@/domains/authentication/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { AppError } from "@/lib/errors";
 import { synchronizeOfferPage } from "@/domains/offers/service";
-import { validateQuoteBeforeWrite } from "@/domains/pricing/quotes";
+import { pricingValidation } from "./pricing-validation";
 type Staff = Awaited<ReturnType<typeof requireStaff>>;
 export type MarketTicket = {
   id: string;
@@ -508,18 +508,33 @@ export function operationDependencies(
   staff: Staff,
 ): OperationDependencies {
   const client = eldoradoClient(),
-    admin = supabaseAdmin();
+    admin = supabaseAdmin(),
+    pricing = pricingValidation(ticket.id, ticket.repricing_quote_id, admin);
   return {
     ...(ticket.repricing_quote_id
       ? {
-          validateQuote: () =>
-            validateQuoteBeforeWrite(ticket.repricing_quote_id!),
+          validateQuote: pricing.verify,
         }
       : {}),
     refreshCreated: () =>
       synchronizeOfferPage(staff.user.id, staff.sessionId, "predefined"),
     current: (change, id) => current(change, id, client),
-    write: (change, id) => client.writeMarketplace(change, id),
+    write: (change, id) =>
+      client.writeMarketplace(change, id, async () => {
+        const { error } = await staff.db.rpc(
+          "assert_claimed_marketplace_authority",
+          {
+            operation_id: ticket.id,
+          },
+        );
+        if (error)
+          throw new AppError(
+            "ELDORADO_WRITE_NOT_SENT",
+            "Current MFA, permissions and independent approval could not be verified. No marketplace change was sent.",
+            409,
+          );
+        pricing.beforeSend();
+      }),
     async claim() {
       const { data, error } = await staff.db.rpc(
         "claim_marketplace_operation",

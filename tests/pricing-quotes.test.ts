@@ -1,10 +1,26 @@
 import { expect, it, vi } from "vitest";
-import { buildPricingQuote, choosePrice } from "@/domains/pricing/quotes";
+import {
+  buildPricingQuote,
+  choosePrice,
+  pricingContextHash,
+  pricingFreshnessGuard,
+  validateQuoteBeforeWrite,
+} from "@/domains/pricing/quotes";
 import type { EldoradoClient } from "@/domains/eldorado/client";
-import type { PricingPolicy } from "@/domains/pricing/models";
+import type { PricingEconomics, PricingPolicy } from "@/domains/pricing/models";
 import { AppError } from "@/lib/errors";
 const ownId = "11111111-1111-4111-8111-111111111111",
   peerId = "22222222-2222-4222-8222-222222222222";
+const now = Date.parse("2026-11-15T12:00:00Z");
+const economics: PricingEconomics = {
+  unitCost: 1,
+  feePercent: 10,
+  fixedFee: 0.1,
+  comparisonQuantity: 1,
+  minMarginPercent: 30,
+  verifiedAt: "2026-11-15T11:00:00Z",
+  validUntil: "2026-11-16T11:00:00Z",
+};
 const details = {
   description: "Synthetic",
   guaranteedDeliveryTime: "Minute20" as const,
@@ -75,6 +91,7 @@ const policy = {
   last_checked_at: null,
   last_error_code: null,
   next_run_at: "2026-11-13T00:00:00Z",
+  economics_context_hash: pricingContextHash(own()),
 } satisfies PricingPolicy;
 function fixture(pages: unknown[][] = [[{ offer: peer() }]], snapshot = own()) {
   const read = vi.fn(
@@ -237,4 +254,254 @@ it("propagates provider backoff instead of manufacturing a recommendation", asyn
     code: "ELDORADO_RATE_LIMITED",
     retryAfter: 3600,
   });
+});
+
+it("uses a rounded economic floor and records auditable current estimates", async () => {
+  const result = await buildPricingQuote(
+    {
+      ...policy,
+      floor: 0.5,
+      economics: { ...economics, minMarginPercent: 50 },
+    },
+    fixture().client,
+    () => now,
+  );
+  expect(result.amount).toBe(2.75);
+  expect(result.proof).toMatchObject({
+    executable: true,
+    blockedReason: null,
+    configuredFloor: 0.5,
+    effectiveFloor: 2.75,
+    collectionStartedAt: "2026-11-15T12:00:00.000Z",
+    observedAt: "2026-11-15T12:00:00.000Z",
+    validUntil: "2026-11-15T12:01:00.000Z",
+    comparisonQuantity: 1,
+    economics: {
+      source: "owner-estimate",
+      grossRevenue: 2.75,
+      fees: 0.375,
+      netRevenue: 2.375,
+      totalCost: 1,
+      profit: 1.375,
+      marginPercent: 50,
+    },
+  });
+});
+
+it("retains simulations without allowing execution with missing, expired or discounted economics", async () => {
+  for (const basis of [
+    undefined,
+    { ...economics, validUntil: "2026-11-15T12:00:00Z" },
+  ]) {
+    const result = await buildPricingQuote(
+      { ...policy, economics: basis },
+      fixture().client,
+      () => now,
+    );
+    expect(result.amount).toBe(1.95);
+    expect(result.proof.executable).toBe(false);
+    expect(result.proof.blockedReason).toBeTruthy();
+  }
+  const discounts = [{ quantity: 2, percentage: 10 }];
+  const snapshot = own();
+  snapshot.details = {
+    ...details,
+    pricing: { ...details.pricing, volumeDiscounts: discounts },
+  } as typeof snapshot.details;
+  const result = await buildPricingQuote(
+    { ...policy, economics },
+    fixture([[{ offer: { ...peer(), volumeDiscounts: discounts } }]], snapshot)
+      .client,
+    () => now,
+  );
+  expect(result.proof.executable).toBe(false);
+  expect(result.proof.blockedReason).toContain("tier-specific");
+});
+
+it("does not carry cost authority across a changed product or package", async () => {
+  const snapshot = { ...own(), gameId: "changed-game" };
+  const result = await buildPricingQuote(
+    { ...policy, economics },
+    fixture([[{ offer: { ...peer(), gameId: "changed-game" } }]], snapshot)
+      .client,
+    () => now,
+  );
+  expect(result.proof.executable).toBe(false);
+  expect(result.proof.blockedReason).toContain("context changed");
+  expect(result.proof.contextHash).not.toBe(policy.economics_context_hash);
+});
+
+it("blocks discounted effective prices even without volume tiers", async () => {
+  for (const discount of [
+    { discountPercentage: 10 },
+    { pricePerUnitWithDiscount: { amount: 1.5, currency: "USD" } },
+    { pricePerUnitWithDiscount: { amount: "unknown", currency: "USD" } },
+  ]) {
+    await expect(
+      buildPricingQuote(
+        { ...policy, economics },
+        fixture([[{ offer: { ...peer(), ...discount } }]]).client,
+        () => now,
+      ),
+    ).rejects.toMatchObject({ code: "COMPARISON_AMBIGUOUS" });
+  }
+  const snapshot = {
+    ...own(),
+    discount: {
+      pricePerUnitWithDiscount: { amount: 1.5, currency: "USD" },
+      discountPercentage: 25,
+      unverified: false,
+    },
+  };
+  await expect(
+    buildPricingQuote(
+      { ...policy, economics },
+      fixture(undefined, snapshot).client,
+      () => now,
+    ),
+  ).rejects.toMatchObject({ code: "DISCOUNT_REVIEW_REQUIRED" });
+});
+
+it("requires stock for the exact comparison basket without matching stock totals", async () => {
+  const configured = {
+    ...policy,
+    economics: { ...economics, comparisonQuantity: 2, fixedFee: 0 },
+  };
+  const sufficient = fixture([[{ offer: { ...peer(), quantity: 3 } }]]);
+  expect(
+    (await buildPricingQuote(configured, sufficient.client, () => now)).proof
+      .executable,
+  ).toBe(true);
+  await expect(
+    buildPricingQuote(
+      configured,
+      fixture([[{ offer: { ...peer(), quantity: 1 } }]]).client,
+      () => now,
+    ),
+  ).rejects.toMatchObject({ code: "NO_EQUIVALENT_OFFERS" });
+  await expect(
+    buildPricingQuote(
+      configured,
+      fixture(undefined, { ...own(), quantity: 1 }).client,
+      () => now,
+    ),
+  ).rejects.toMatchObject({ code: "COMPARISON_QUANTITY_UNAVAILABLE" });
+});
+
+it("does not amortize a fixed fee over more units than a buyer must actually buy", async () => {
+  const result = await buildPricingQuote(
+    {
+      ...policy,
+      economics: { ...economics, fixedFee: 0.2, comparisonQuantity: 2 },
+    },
+    fixture().client,
+    () => now,
+  );
+  expect(result.proof.executable).toBe(false);
+  expect(result.proof.blockedReason).toContain("minimum purchase quantity");
+});
+
+it("fails closed for top-ups without authoritative dimensional mapping", async () => {
+  const f = fixture(undefined, { ...own(), category: "TopUp" });
+  await expect(
+    buildPricingQuote({ ...policy, economics }, f.client, () => now),
+  ).rejects.toMatchObject({ code: "TOPUP_COMPARISON_UNVERIFIED" });
+  expect(f.read).not.toHaveBeenCalled();
+});
+
+it("refuses slow or future-dated market collection and catches expiry after OAuth or a claim", async () => {
+  let clock = now;
+  const f = fixture();
+  const originalRead = f.read.getMockImplementation()!;
+  f.read.mockImplementation(async (...args) => {
+    const result = await originalRead(...args);
+    clock += 60_000;
+    return result;
+  });
+  await expect(
+    buildPricingQuote({ ...policy, economics }, f.client, () => clock),
+  ).rejects.toMatchObject({ code: "COMPARISON_STALE" });
+  const result = await buildPricingQuote(
+    { ...policy, economics },
+    fixture().client,
+    () => now,
+  );
+  const expiry = new Date(now + 120_000).toISOString();
+  clock = now;
+  const guard = pricingFreshnessGuard(result.proof, expiry, () => clock);
+  expect(guard).not.toThrow();
+  clock = now + 60_000;
+  expect(guard).toThrow("expired before sending");
+  expect(
+    pricingFreshnessGuard(
+      { ...result.proof, observedAt: new Date(now + 6000).toISOString() },
+      expiry,
+      () => now,
+    ),
+  ).toThrow("expired before sending");
+  expect(
+    pricingFreshnessGuard(result.proof, new Date(now).toISOString(), () => now),
+  ).toThrow("approved quote expired");
+});
+
+function validationAdmin(
+  quote: object,
+  savedPolicy: object = { ...policy, economics },
+) {
+  return {
+    from(table: string) {
+      return {
+        select: () => ({
+          eq: () => ({
+            single: async () => ({
+              data: table === "repricing_quotes" ? quote : savedPolicy,
+              error: null,
+            }),
+          }),
+        }),
+      };
+    },
+  } as unknown as NonNullable<
+    Parameters<typeof validateQuoteBeforeWrite>[1]
+  >["admin"];
+}
+
+it("rejects an expired approved quote before network and refreshes evidence only within its original lifecycle", async () => {
+  const fresh = await buildPricingQuote(
+    { ...policy, economics },
+    fixture().client,
+    () => now,
+  );
+  const stored = {
+    id: ownId,
+    policy_id: policy.id,
+    policy_version: policy.version,
+    amount: fresh.amount,
+    currency: fresh.currency,
+    before_snapshot: fresh.before,
+    proof: fresh.proof,
+    expires_at: new Date(now + 120_000).toISOString(),
+  };
+  const f = fixture();
+  await expect(
+    validateQuoteBeforeWrite(ownId, {
+      admin: validationAdmin({
+        ...stored,
+        expires_at: new Date(now).toISOString(),
+      }),
+      client: f.client,
+      now: () => now,
+    }),
+  ).rejects.toMatchObject({ code: "QUOTE_EXPIRED" });
+  expect(f.read).not.toHaveBeenCalled();
+  let clock = now + 90_000;
+  const validation = await validateQuoteBeforeWrite(ownId, {
+    admin: validationAdmin(stored),
+    client: f.client,
+    now: () => clock,
+  });
+  expect(validation.proof.observedAt).toBe(new Date(clock).toISOString());
+  expect(validation.assertFresh).not.toThrow();
+  clock = now + 120_000;
+  expect(validation.assertFresh).toThrow("approved quote expired");
 });
