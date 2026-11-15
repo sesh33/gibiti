@@ -1,0 +1,431 @@
+/* RIVOX motion accents. Decorative loops live only in the hero; operating
+   surfaces move once on deliberate pointer interaction. */
+.rivox-hero.workspace-hero {
+  border-color: #6c98e966;
+  box-shadow:
+    inset 0 1px 0 #d9ecff14,
+    0 24px 75px #02061145,
+    0 0 48px #5378ff09;
+}
+.rivox-hero.workspace-hero::after {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 42%;
+  height: 1px;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #94caff,
+    #d2fbff,
+    transparent
+  );
+  box-shadow: 0 0 17px #81d1ff80;
+  opacity: 0;
+  transform: translate3d(-130%, 0, 0);
+  animation: rivox-edge-light 11s ease-in-out infinite;
+}
+.rivox-hero .hero-orbit {
+  perspective: 900px;
+  isolation: isolate;
+}
+.rivox-hero .hero-orbit::before {
+  position: absolute;
+  z-index: -1;
+  inset: -9% -14%;
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse,
+    #769cff27,
+    #4496d90a 48%,
+    transparent 72%
+  );
+  opacity: 0.7;
+  animation: rivox-energy-bloom 9s ease-in-out infinite alternate;
+}
+.rivox-hero .orbit-ring {
+  pointer-events: none;
+}
+.rivox-hero .orbit-ring-one {
+  border-top-color: #a7d7ff99;
+  border-right-color: #8caeff20;
+  border-bottom-color: #7dbcf167;
+  animation: rivox-orbit-clockwise 48s linear infinite;
+}
+.rivox-hero .orbit-ring-two {
+  border-color: #9ab9f04a;
+  border-left-color: #b5ecffa6;
+  animation: rivox-orbit-counter 66s linear infinite;
+}
+.rivox-hero .orbit-ring-three {
+  border-color: #91bdff1a;
+  border-right-color: #86d5e75c;
+  animation: rivox-orbit-clockwise 86s linear infinite;
+}
+.rivox-hero .orbit-core {
+  overflow: hidden;
+  transform-style: preserve-3d;
+  animation: rivox-core-float 8s ease-in-out infinite;
+  transition:
+    border-color 300ms ease,
+    box-shadow 300ms ease;
+}
+.rivox-hero .orbit-core::before {
+  position: absolute;
+  z-index: 0;
+  top: -50%;
+  left: -110%;
+  width: 75%;
+  height: 200%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, #ffffff28, transparent);
+  opacity: 0;
+  transform: translate3d(-50%, 0, 0) rotate(24deg);
+  animation: rivox-core-gloss 13s ease-in-out infinite;
+}
+.rivox-hero .orbit-core::after {
+  z-index: 2;
+  pointer-events: none;
+}
+.rivox-hero .orbit-core > svg {
+  position: relative;
+  z-index: 1;
+}
+.rivox-hero .orbit-point {
+  animation: rivox-point-light 7s ease-in-out infinite alternate;
+}
+.rivox-hero .orbit-point-two {
+  animation-delay: -3.5s;
+}
+.rivox-hero h2 > span {
+  background-image: linear-gradient(
+    105deg,
+    #9ebdff 0%,
+    #b4d7ff 48%,
+    #adf0f0 100%
+  );
+}
+
+/* Stable geometry and stronger focus apply to touch, keyboard and pointer. */
+.page-content
+  :is(.metric-card, .report-option, .reply-option, .role-profile-card) {
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    border-color 240ms ease,
+    box-shadow 240ms ease,
+    background 240ms ease;
+}
+.page-content :is(.metric-card, .report-option) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.page-content :is(.metric-card, .report-option) > * {
+  position: relative;
+  z-index: 1;
+}
+.page-content :is(.metric-card, .report-option)::after {
+  position: absolute;
+  z-index: 0;
+  top: -35%;
+  bottom: -35%;
+  left: 0;
+  width: 30%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, #d2eaff0e, transparent);
+  opacity: 0;
+  transform: translate3d(-160%, 0, 0) rotate(-18deg);
+  transition:
+    transform 850ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    opacity 180ms ease;
+}
+.commerce-reports .report-option.selected {
+  border-color: #a1c4ff;
+  box-shadow:
+    inset 0 0 0 1px #8eb8ff20,
+    0 8px 36px #5378ff10;
+}
+.commerce-reports .report-option.selected::before {
+  position: absolute;
+  top: 0;
+  left: 20px;
+  width: 75px;
+  height: 1px;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, #b6e8ff, transparent);
+  box-shadow: 0 0 14px #91c4ff60;
+}
+.button-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.button-primary::after {
+  position: absolute;
+  z-index: -1;
+  top: -60%;
+  bottom: -60%;
+  left: 0;
+  width: 35%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, #e2f4ff3d, transparent);
+  opacity: 0;
+  transform: translate3d(-180%, 0, 0) rotate(-20deg);
+  transition:
+    transform 650ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    opacity 150ms ease;
+}
+.button,
+.nav-link {
+  transition:
+    transform 180ms ease,
+    color 180ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    background 220ms ease;
+}
+.nav-link::before {
+  position: absolute;
+  top: 50%;
+  left: 7px;
+  width: 29px;
+  height: 29px;
+  content: "";
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, #80bbff28, transparent 72%);
+  opacity: 0;
+  transform: translate3d(0, -50%, 0) scale(0.7);
+  transition:
+    transform 240ms ease,
+    opacity 240ms ease;
+}
+.nav-link > svg {
+  transition:
+    transform 220ms ease,
+    color 220ms ease;
+}
+.input-search,
+.field-label :is(input, textarea, select) {
+  transition:
+    border-color 200ms ease,
+    background 200ms ease,
+    box-shadow 220ms ease;
+}
+.input-search:focus-within,
+.field-label :is(input, textarea, select):focus-visible {
+  border-color: #97caff;
+  box-shadow:
+    0 0 0 3px #74b4ff18,
+    0 0 25px #5378ff0d;
+}
+.data-panel:focus-within {
+  border-color: #5c80b6;
+}
+.page-content tbody tr:hover {
+  background: linear-gradient(90deg, #5378ff10, #79d5e908);
+}
+
+/* Share the atmosphere's page-visibility signal without another JS listener. */
+body:has(.workspace-atmosphere[data-paused="true"]) .rivox-hero::after,
+body:has(.workspace-atmosphere[data-paused="true"])
+  .rivox-hero
+  .hero-orbit::before,
+body:has(.workspace-atmosphere[data-paused="true"]) .rivox-hero .orbit-ring,
+body:has(.workspace-atmosphere[data-paused="true"]) .rivox-hero .orbit-core,
+body:has(.workspace-atmosphere[data-paused="true"])
+  .rivox-hero
+  .orbit-core::before,
+body:has(.workspace-atmosphere[data-paused="true"]) .rivox-hero .orbit-point {
+  animation-play-state: paused;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rivox-hero:hover .orbit-core {
+    border-color: #d1eaff;
+    box-shadow:
+      inset 0 2px 1px #ffffff30,
+      0 0 0 10px #9ec7ff0a,
+      0 20px 44px #040b2770,
+      0 0 78px #6aabff52;
+  }
+  .page-content :is(.metric-card, .report-option):hover {
+    transform: translate3d(0, -3px, 0);
+    border-color: #779fdb;
+    box-shadow:
+      0 16px 35px #02071535,
+      0 0 24px #5378ff0b;
+  }
+  .page-content :is(.metric-card, .report-option):hover::after {
+    opacity: 1;
+    transform: translate3d(440%, 0, 0) rotate(-18deg);
+  }
+  .page-content :is(.reply-option, .role-profile-card):hover {
+    transform: translate3d(0, -2px, 0);
+    border-color: #6c94ce;
+    box-shadow: 0 9px 25px #02071526;
+  }
+  .button:not(:disabled):hover {
+    transform: translate3d(0, -1px, 0);
+  }
+  .button:not(:disabled):active {
+    transform: translate3d(0, 0, 0) scale(0.985);
+  }
+  .button-primary:not(:disabled):hover::after {
+    opacity: 1;
+    transform: translate3d(420%, 0, 0) rotate(-20deg);
+  }
+  .nav-link:hover {
+    transform: translate3d(2px, 0, 0);
+  }
+  .nav-link:hover::before,
+  .nav-link:focus-visible::before {
+    opacity: 1;
+    transform: translate3d(0, -50%, 0) scale(1);
+  }
+  .nav-link:hover > svg {
+    color: #bbd8ff;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes rivox-edge-light {
+  0%,
+  13% {
+    opacity: 0;
+    transform: translate3d(-130%, 0, 0);
+  }
+  28% {
+    opacity: 0.9;
+  }
+  57% {
+    opacity: 0.75;
+  }
+  74%,
+  100% {
+    opacity: 0;
+    transform: translate3d(340%, 0, 0);
+  }
+}
+@keyframes rivox-energy-bloom {
+  from {
+    opacity: 0.5;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 0.95;
+    transform: scale(1.1);
+  }
+}
+@keyframes rivox-orbit-clockwise {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rivox-orbit-counter {
+  from {
+    transform: rotate(-25deg);
+  }
+  to {
+    transform: rotate(-385deg);
+  }
+}
+@keyframes rivox-core-float {
+  0%,
+  100% {
+    transform: translate3d(0, 2px, 0) rotateX(5deg) rotateY(-8deg)
+      rotateZ(-8deg);
+  }
+  50% {
+    transform: translate3d(0, -8px, 0) rotateX(-3deg) rotateY(7deg)
+      rotateZ(-4deg);
+  }
+}
+@keyframes rivox-core-gloss {
+  0%,
+  24% {
+    opacity: 0;
+    transform: translate3d(-50%, 0, 0) rotate(24deg);
+  }
+  34% {
+    opacity: 1;
+  }
+  48% {
+    opacity: 0;
+    transform: translate3d(370%, 0, 0) rotate(24deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(370%, 0, 0) rotate(24deg);
+  }
+}
+@keyframes rivox-point-light {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .page-content
+    :is(.metric-card, .report-option, .reply-option, .role-profile-card):hover,
+  .button:not(:disabled):hover,
+  .nav-link:hover,
+  .nav-link:hover > svg {
+    transform: none;
+  }
+  .page-content :is(.metric-card, .report-option)::after,
+  .button-primary::after,
+  .nav-link::before {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rivox-hero::after,
+  .rivox-hero .hero-orbit::before,
+  .rivox-hero .orbit-ring,
+  .rivox-hero .orbit-core,
+  .rivox-hero .orbit-core::before,
+  .rivox-hero .orbit-core > svg,
+  .rivox-hero .orbit-point,
+  .page-content
+    :is(.metric-card, .report-option, .reply-option, .role-profile-card),
+  .page-content :is(.metric-card, .report-option)::after,
+  .button,
+  .button-primary::after,
+  .nav-link,
+  .nav-link::before,
+  .nav-link > svg {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+  .rivox-hero::after,
+  .rivox-hero .orbit-core::before,
+  .page-content :is(.metric-card, .report-option)::after,
+  .button-primary::after,
+  .nav-link::before {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .rivox-hero::after,
+  .rivox-hero .hero-orbit::before,
+  .rivox-hero .orbit-core::before,
+  .page-content :is(.metric-card, .report-option)::after,
+  .button-primary::after,
+  .nav-link::before {
+    display: none;
+  }
+}

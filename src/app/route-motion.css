@@ -1,0 +1,110 @@
+/* Route motion conveys navigation, never marketplace activity. */
+.route-frame {
+  min-width: 0;
+}
+.page-heading {
+  position: relative;
+}
+.page-heading::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: min(190px, 45%);
+  height: 1px;
+  background: linear-gradient(90deg, var(--primary), #88d5ff88, transparent);
+  box-shadow: -10px 0 22px #5378ff30;
+  transform-origin: left;
+  animation: heading-arrival 650ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: none;
+}
+.loading-workspace {
+  position: relative;
+  padding-top: 25px;
+}
+.route-loading-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+  color: #a9bee1;
+  font-size: 12px;
+  letter-spacing: 0.1px;
+}
+.route-loading-emblem {
+  display: grid;
+  place-items: center;
+  width: 37px;
+  height: 37px;
+  background: #5378ff20;
+  border: 1px solid #87afff40;
+  border-radius: 12px;
+  color: #bed6ff;
+}
+.route-loading-track {
+  height: 2px;
+  overflow: hidden;
+  background: #28406044;
+  border-radius: 2px;
+  margin-bottom: 30px;
+}
+.route-loading-track::after {
+  content: "";
+  display: block;
+  width: 38%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--primary),
+    #97e9ff,
+    transparent
+  );
+  animation: route-loading-sweep 1500ms ease-in-out infinite;
+}
+.loading-workspace .skeleton-lines,
+.loading-workspace .skeleton-panel {
+  border-color: #40639730;
+  background: linear-gradient(110deg, #152338 20%, #233958 40%, #152338 60%);
+  background-size: 200% 100%;
+  animation: skeleton-energy 2400ms ease-in-out infinite;
+}
+@keyframes heading-arrival {
+  from {
+    transform: scaleX(0.1);
+    opacity: 0.1;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+@keyframes route-loading-sweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(370%);
+  }
+}
+@keyframes skeleton-energy {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-heading::after,
+  .route-loading-track::after,
+  .loading-workspace .skeleton-lines,
+  .loading-workspace .skeleton-panel {
+    animation: none;
+  }
+  .route-loading-track::after {
+    transform: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}

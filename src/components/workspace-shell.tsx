@@ -1,9 +1,16 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { workspaceBrand } from "@/lib/branding";
+import { WorkspaceTransition } from "@/components/workspace-transition";
 import {
   Activity,
   FileSpreadsheet,
@@ -163,16 +170,22 @@ export function WorkspaceShell({
   );
   const menuRef = useRef<HTMLButtonElement>(null),
     closeMenuRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    if (compact && mobileOpen)
+      closeMenuRef.current?.focus({ preventScroll: true });
+  }, [compact, mobileOpen]);
   useEffect(() => {
     if (!compact || !mobileOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const frame = requestAnimationFrame(() => closeMenuRef.current?.focus());
     const trigger = menuRef.current;
     return () => {
-      cancelAnimationFrame(frame);
       document.body.style.overflow = previousOverflow;
-      if (trigger?.isConnected) trigger.focus();
+      if (
+        trigger?.isConnected &&
+        !document.querySelector('[role="dialog"][data-state="open"]')
+      )
+        trigger.focus({ preventScroll: true });
     };
   }, [compact, mobileOpen]);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -528,7 +541,7 @@ export function WorkspaceShell({
           </div>
         )}
         <main className="page-content" id="workspace-content" tabIndex={-1}>
-          {children}
+          <WorkspaceTransition>{children}</WorkspaceTransition>
         </main>
         <footer className="workspace-footer">
           <span>

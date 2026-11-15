@@ -5,8 +5,13 @@ import "./commerce-refresh.css";
 import "./operations-refresh.css";
 import "./settings-refresh.css";
 import "./overview-auth-refresh.css";
+import "./atmosphere.css";
+import "./cinematic-interactions.css";
+import "./route-motion.css";
+import "./depth-surfaces.css";
 import { Providers } from "./providers";
 import { workspaceBrand } from "@/lib/branding";
+import { WorkspaceAtmosphere } from "@/components/workspace-atmosphere";
 export const metadata: Metadata = {
   title: {
     default: `${workspaceBrand.name} Control`,
@@ -23,7 +28,10 @@ export default function RootLayout({
       <body
         style={{ "--primary": workspaceBrand.accent } as React.CSSProperties}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          <WorkspaceAtmosphere />
+          {children}
+        </Providers>
       </body>
     </html>
   );

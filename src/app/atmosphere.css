@@ -1,0 +1,211 @@
+/* Atmospheric depth sits below every surface and never captures input. */
+body {
+  isolation: isolate;
+}
+.workspace-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  background: #080d17;
+}
+.workspace-atmosphere > div {
+  position: absolute;
+  pointer-events: none;
+}
+.atmosphere-aurora {
+  width: 105vw;
+  height: 100vh;
+  transform-origin: center;
+  will-change: transform;
+}
+.atmosphere-aurora-blue {
+  top: -36vh;
+  right: -33vw;
+  background: radial-gradient(
+    ellipse at 48% 48%,
+    #416eff50 0%,
+    #305ac738 23%,
+    #244b9310 44%,
+    transparent 67%
+  );
+  animation: atmosphere-blue-drift 31s ease-in-out infinite alternate;
+}
+.atmosphere-aurora-cyan {
+  top: 5vh;
+  left: -47vw;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    #42bdd92c 0%,
+    #206a8b12 29%,
+    transparent 64%
+  );
+  animation: atmosphere-cyan-drift 37s ease-in-out infinite alternate;
+}
+.atmosphere-aurora-violet {
+  right: -31vw;
+  bottom: -52vh;
+  background: radial-gradient(
+    ellipse at 48% 45%,
+    #8065ef2b 0%,
+    #3e4f9a12 27%,
+    transparent 67%
+  );
+  animation: atmosphere-violet-drift 43s ease-in-out infinite alternate;
+}
+.atmosphere-coordinate-field {
+  inset: -28vh -18vw -10vh;
+  background-image:
+    linear-gradient(#86aeed09 1px, transparent 1px),
+    linear-gradient(90deg, #86aeed09 1px, transparent 1px);
+  background-size: 82px 82px;
+  transform: perspective(800px) rotateX(38deg) rotateZ(-16deg) scale(1.2);
+  transform-origin: center 20%;
+  mask-image: radial-gradient(ellipse at 82% 10%, #000 0%, transparent 59%);
+  opacity: 0.55;
+}
+.atmosphere-stars {
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 17% 24%, #8cbeff7a 0 1px, transparent 1.8px),
+    radial-gradient(circle at 83% 19%, #a1d7ff65 0 1px, transparent 1.8px),
+    radial-gradient(circle at 69% 63%, #a1b3ff45 0 1px, transparent 1.8px),
+    radial-gradient(circle at 36% 81%, #85b6e340 0 1px, transparent 1.8px),
+    radial-gradient(circle at 93% 47%, #85b6e350 0 1px, transparent 1.8px);
+  opacity: 0.5;
+  animation: atmosphere-constellation 9s ease-in-out infinite alternate;
+}
+.atmosphere-cursor-halo {
+  left: 0;
+  top: 0;
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #77adff25 0%,
+    #5378ff0c 24%,
+    transparent 66%
+  );
+  transform: translate3d(
+    calc(var(--atmosphere-x, 70vw) - 350px),
+    calc(var(--atmosphere-y, 20vh) - 350px),
+    0
+  );
+  opacity: 0;
+  transition: opacity 700ms ease;
+  will-change: transform;
+}
+.workspace-atmosphere[data-pointer-active="true"] .atmosphere-cursor-halo {
+  opacity: 1;
+}
+.atmosphere-vignette {
+  inset: 0;
+  background: linear-gradient(0deg, #04081040, transparent 42%);
+}
+.workspace-atmosphere[data-paused="true"] > div {
+  animation-play-state: paused !important;
+}
+
+/* Existing cards retain their opaque reading surfaces; light fills the canvas. */
+.main-shell {
+  background: transparent;
+}
+.rivox-access.auth-page {
+  background: transparent;
+}
+.rivox-access .auth-art {
+  background:
+    radial-gradient(ellipse at 15% 43%, #5378ff12, transparent 62%),
+    linear-gradient(145deg, #152039be, #0e172980 75%, #121d3190);
+}
+
+@keyframes atmosphere-blue-drift {
+  0% {
+    transform: translate3d(-5vw, -3vh, 0) rotate(-12deg) scale(1);
+  }
+  55% {
+    transform: translate3d(-15vw, 10vh, 0) rotate(3deg) scale(1.08);
+  }
+  100% {
+    transform: translate3d(-7vw, 21vh, 0) rotate(14deg) scale(1.02);
+  }
+}
+@keyframes atmosphere-cyan-drift {
+  0% {
+    transform: translate3d(0, 8vh, 0) rotate(12deg);
+  }
+  100% {
+    transform: translate3d(20vw, -14vh, 0) rotate(-14deg) scale(1.15);
+  }
+}
+@keyframes atmosphere-violet-drift {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(-8deg);
+  }
+  100% {
+    transform: translate3d(-14vw, -18vh, 0) rotate(15deg) scale(1.12);
+  }
+}
+@keyframes atmosphere-constellation {
+  from {
+    opacity: 0.3;
+  }
+  to {
+    opacity: 0.65;
+  }
+}
+@media (max-width: 820px) {
+  .atmosphere-aurora {
+    width: 150vw;
+    height: 85vh;
+  }
+  .atmosphere-aurora-blue {
+    right: -67vw;
+    top: -21vh;
+    opacity: 0.85;
+  }
+  .atmosphere-aurora-cyan {
+    left: -90vw;
+    top: 15vh;
+    opacity: 0.75;
+  }
+  .atmosphere-aurora-violet {
+    display: none;
+  }
+  .atmosphere-coordinate-field {
+    opacity: 0.3;
+    background-size: 68px 68px;
+  }
+  .atmosphere-stars {
+    opacity: 0.3;
+    animation: none;
+  }
+}
+@media (hover: none), (pointer: coarse) {
+  .atmosphere-cursor-halo {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-atmosphere > div {
+    animation: none !important;
+    will-change: auto;
+  }
+  .atmosphere-cursor-halo {
+    display: none;
+  }
+  .atmosphere-aurora-blue {
+    transform: translate3d(-9vw, 5vh, 0) rotate(-8deg);
+  }
+  .atmosphere-aurora-cyan {
+    transform: translate3d(5vw, -5vh, 0) rotate(10deg);
+  }
+}
+@media (forced-colors: active) {
+  .workspace-atmosphere {
+    display: none;
+  }
+}
