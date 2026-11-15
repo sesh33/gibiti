@@ -84,7 +84,9 @@ export function AuthForm({
           <span className="brand-symbol">
             <Zap size={20} fill="currentColor" />
           </span>
-          {workspaceBrand.name}
+          <span className="brand-name" title={workspaceBrand.name}>
+            {workspaceBrand.name}
+          </span>
           <span className="wordmark-sub">CONTROL</span>
         </Link>
         <div className="auth-manifesto">

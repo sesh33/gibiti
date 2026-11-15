@@ -4,7 +4,7 @@ import { rolePermissions } from "@/domains/authorization/permissions";
 
 describe("permission-aware operational home", () => {
   it.each([
-    ["OWNER", "/offers"],
+    ["OWNER", "/overview"],
     ["ADMIN", "/offers"],
     ["SUPERVISOR", "/orders"],
     ["SUPPORT_AGENT", "/orders"],

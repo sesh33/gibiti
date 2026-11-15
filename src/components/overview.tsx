@@ -17,6 +17,7 @@ import { api } from "@/lib/api-client";
 import { money } from "@/lib/utils";
 import type { OrderStateBucket } from "@/domains/orders/states";
 import { OperationalSummary } from "@/components/operational-summary";
+import { WorkspaceHero } from "@/components/workspace-hero";
 type Metrics = {
   orders: number;
   completed: number;
@@ -52,6 +53,7 @@ export function Overview({ configured }: { configured: boolean }) {
           </Link>
         </Button>
       </PageHeading>
+      <WorkspaceHero configured={configured} />
       <div
         className="metric-grid"
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}

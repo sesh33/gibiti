@@ -59,6 +59,7 @@ export function EldoradoConnection({ configured }: { configured: boolean }) {
       setMessage(result.message);
       await Promise.all([
         cache.invalidateQueries({ queryKey: ["settings"] }),
+        cache.invalidateQueries({ queryKey: ["automation-settings"] }),
         connection.refetch(),
       ]);
     } catch (error) {
@@ -82,7 +83,11 @@ export function EldoradoConnection({ configured }: { configured: boolean }) {
         { method: "POST", body: JSON.stringify({ action: "verify" }) },
       );
       setMessage(result.message);
-      await connection.refetch();
+      await Promise.all([
+        connection.refetch(),
+        cache.invalidateQueries({ queryKey: ["automation-settings"] }),
+        cache.invalidateQueries({ queryKey: ["settings"] }),
+      ]);
     } catch (error) {
       setFailed(true);
       setMessage(

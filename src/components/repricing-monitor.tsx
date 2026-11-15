@@ -39,6 +39,13 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
         <Zap size={14} style={{ display: "inline" }} /> PRECISION REPRICING
         ENGINE
       </span>
+      <div className="engine-cadence">
+        <span>MINIMUM CHECK INTERVAL</span>
+        <strong>
+          15<small>sec</small>
+        </strong>
+        <span>Provider limits respected</span>
+      </div>
       <h2>Compete on price. Keep your floor.</h2>
       <p className="scope-note">
         Price checks can run at a 15-second minimum interval. Actual cadence
@@ -46,6 +53,17 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
         Complete-market matching and a fresh pre-write check protect every
         adjustment.
       </p>
+      <div className="engine-steps">
+        <span>
+          <i>01</i> Verify equivalent offers
+        </span>
+        <span>
+          <i>02</i> Apply your floor & difference
+        </span>
+        <span>
+          <i>03</i> Confirm the real outcome
+        </span>
+      </div>
       <div className="repricing-status-grid">
         <div>
           <strong>{rules.data ? items.length : "—"}</strong>

@@ -1,6 +1,8 @@
 /** Choose a useful landing page using verified permissions, never an unavailable integration. */
 export function workspaceHome(granted: Iterable<string>) {
   const permissions = new Set(granted);
+  if (permissions.has("settings.manage") && permissions.has("analytics.read"))
+    return "/overview";
   if (permissions.has("offers.read") && permissions.has("offers.pause"))
     return "/offers";
   if (permissions.has("orders.read") || permissions.has("orders.read_assigned"))

@@ -198,7 +198,9 @@ export function WorkspaceShell({
           <span className="brand-symbol">
             <Zap size={20} fill="currentColor" />
           </span>
-          {workspaceBrand.name}
+          <span className="brand-name" title={workspaceBrand.name}>
+            {workspaceBrand.name}
+          </span>
           <span className="wordmark-sub">CONTROL</span>
         </Link>
         <button
@@ -281,7 +283,10 @@ export function WorkspaceShell({
             <span>
               {staff?.name ?? "Workspace setup"}
               <small>
-                {staff?.role.replaceAll("_", " ") ?? "Authentication required"}
+                {staff?.role === "OWNER"
+                  ? "Owner · Full control"
+                  : (staff?.role.replaceAll("_", " ") ??
+                    "Authentication required")}
               </small>
             </span>
             {staff && (
@@ -375,7 +380,7 @@ export function WorkspaceShell({
         <footer className="workspace-footer">
           <span>
             <span className="status-dot" /> {workspaceBrand.name} CONTROL{" "}
-            <span className="footer-version">/ v0.1 foundation</span>
+            <span className="footer-version">/ Seller operations suite</span>
           </span>
           <span>Private by design. Precise by default.</span>
         </footer>
