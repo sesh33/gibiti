@@ -1,0 +1,83 @@
+/* Small geometry fixes keep the visual layer comfortable to operate. */
+.reply-fields > .field-label,
+.ops-sync-toolbar > .field-label {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Balance the scrollport gutters so focus outlines remain visible without
+   changing the position or width of the actual navigation links. */
+.sidebar nav {
+  margin-left: -6px;
+  padding-left: 6px;
+  margin-right: -9px;
+  padding-right: 9px;
+  margin-top: -3px;
+  padding-top: 3px;
+}
+
+@media (max-width: 820px) {
+  /* CSS also protects the off-screen navigation before hydration establishes
+     the matching inert attribute. Delay hiding only for its closing slide. */
+  .sidebar {
+    visibility: hidden;
+    transition:
+      transform 200ms ease,
+      visibility 0s linear 200ms;
+  }
+
+  .app-shell[data-navigation-open="true"] .sidebar {
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .sidebar .nav-link {
+    min-height: 44px;
+  }
+
+  .topbar .icon-button,
+  .topbar .global-search,
+  .sidebar .navigation-close,
+  .sidebar .profile > button,
+  .visual-effects-trigger.effects-floating {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .orders-workspace td:last-child > a {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 520px) {
+  /* Leave room for the appearance control and full-size touch targets. The
+     current page remains visible; only the redundant Workspace prefix goes. */
+  .topbar .breadcrumbs {
+    font-size: 0;
+    gap: 0;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .topbar .breadcrumbs > span {
+    display: none;
+  }
+
+  .topbar .breadcrumbs > strong {
+    font-size: 11px;
+    max-width: 100%;
+  }
+
+  .topbar-actions {
+    gap: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}

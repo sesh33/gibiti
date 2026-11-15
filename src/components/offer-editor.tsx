@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -446,7 +447,7 @@ export function OfferEditor({ configured }: { configured: boolean }) {
                   {comparison.data.page ?? comparePage} of{" "}
                   {comparison.data.totalPages ?? "unknown"}.
                 </p>
-                <div className="table-scroll">
+                <TableScroll label="Marketplace offer comparison">
                   <table>
                     <thead>
                       <tr>
@@ -465,7 +466,7 @@ export function OfferEditor({ configured }: { configured: boolean }) {
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </TableScroll>
               </>
             )}
           </section>

@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
@@ -113,7 +114,7 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
       </p>
       {rules.isError && <p role="alert">{rules.error.message}</p>}
       {history.isError && <p role="alert">{history.error.message}</p>}
-      <div className="table-scroll">
+      <TableScroll label="Pricing simulation history">
         <table>
           <thead>
             <tr>
@@ -176,7 +177,7 @@ export function RepricingMonitor({ configured }: { configured: boolean }) {
             })}
           </tbody>
         </table>
-      </div>
+      </TableScroll>
       {!history.data?.items.length && (
         <p className="scope-note">
           <Activity size={14} style={{ display: "inline" }} /> No visible market

@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
@@ -335,7 +336,7 @@ export function Settings({ configured }: { configured: boolean }) {
           {status.isError ? (
             <QueryError message={status.error.message} />
           ) : status.data?.integration ? (
-            <div className="table-scroll">
+            <TableScroll label="Integration synchronization health">
               <table>
                 <thead>
                   <tr>
@@ -382,7 +383,7 @@ export function Settings({ configured }: { configured: boolean }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
           ) : (
             <p className="scope-note">
               {status.isFetching

@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -378,7 +379,7 @@ export function OfferBatchCenter({ configured }: { configured: boolean }) {
             </>
           ) : (
             <>
-              <div className="table-scroll">
+              <TableScroll label="Batch change preview">
                 <table>
                   <thead>
                     <tr>
@@ -410,7 +411,7 @@ export function OfferBatchCenter({ configured }: { configured: boolean }) {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
               <p className="scope-note">
                 Preview expires at {preview.expiresAt}. Request creation is
                 atomic; actual marketplace changes are reviewed and executed

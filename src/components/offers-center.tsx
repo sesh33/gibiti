@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -585,7 +586,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
           className="data-panel"
           aria-label="Listing synchronization results"
         >
-          <div className="table-scroll">
+          <TableScroll label="Listing synchronization results">
             <table>
               <thead>
                 <tr>
@@ -616,7 +617,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </section>
       )}
       <section
@@ -777,7 +778,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
           <div className="skeleton-panel" aria-label="Loading listings" />
         ) : (
           <>
-            <div className="table-scroll">
+            <TableScroll label="Offer catalog">
               <table>
                 <thead>
                   <tr>
@@ -943,7 +944,7 @@ export function OffersCenter({ configured }: { configured: boolean }) {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             {!rows.length && (
               <EmptyState
                 title="A real view of your listing inventory."

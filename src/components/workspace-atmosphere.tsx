@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useVisualEffects } from "@/lib/visual-effects";
+import { LuminousField } from "@/components/luminous-field";
 
 /** Decorative light only. No account state, networking or per-frame React work. */
 export function WorkspaceAtmosphere() {
   const atmosphere = useRef<HTMLDivElement>(null);
+  const { cinematic } = useVisualEffects();
 
   useEffect(() => {
     const element = atmosphere.current;
@@ -39,7 +42,7 @@ export function WorkspaceAtmosphere() {
     const configurePointer = () => {
       removePointerListeners();
       hidePointer();
-      if (motion.matches || !precision.matches) return;
+      if (!cinematic || motion.matches || !precision.matches) return;
       window.addEventListener("pointermove", movePointer, { passive: true });
       window.addEventListener("pointerleave", hidePointer);
       window.addEventListener("blur", hidePointer);
@@ -66,10 +69,11 @@ export function WorkspaceAtmosphere() {
       document.removeEventListener("visibilitychange", visibility);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [cinematic]);
 
   return (
     <div ref={atmosphere} className="workspace-atmosphere" aria-hidden="true">
+      <LuminousField />
       <div className="atmosphere-aurora atmosphere-aurora-blue" />
       <div className="atmosphere-aurora atmosphere-aurora-cyan" />
       <div className="atmosphere-aurora atmosphere-aurora-violet" />

@@ -1,0 +1,42 @@
+/* Reading wide tables remains possible with touch, mouse and keyboard. */
+.table-scroll-region:focus-visible {
+  outline: 2px solid #9bc4ff;
+  outline-offset: -3px;
+}
+.table-scroll-hint {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 29px;
+  padding: 7px 15px;
+  border-bottom: 1px solid #45628940;
+  background: #142237;
+  color: #a8bedf;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.table-scroll-hint > svg {
+  flex-shrink: 0;
+  color: #91b7f0;
+}
+.table-scroll-keyboard-help {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (forced-colors: active) {
+  .table-scroll-hint {
+    border-bottom-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

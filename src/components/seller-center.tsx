@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Power, RefreshCw, ShieldCheck } from "lucide-react";
@@ -389,7 +390,7 @@ export function SellerCenter({ configured }: { configured: boolean }) {
       >
         <h2>Seller action history</h2>
         {history.isError && <QueryError message={history.error.message} />}
-        <div className="table-scroll">
+        <TableScroll label="Seller action history">
           <table>
             <thead>
               <tr>
@@ -432,7 +433,7 @@ export function SellerCenter({ configured }: { configured: boolean }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
         {history.data && !history.data.items.length && (
           <p className="scope-note">No Seller actions recorded.</p>
         )}

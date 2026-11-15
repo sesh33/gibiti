@@ -1,0 +1,224 @@
+.visual-effects-trigger {
+  border: 1px solid transparent;
+}
+.visual-effects-trigger[data-effects-active="true"] {
+  color: #b5d5ff;
+  background: #5378ff16;
+  border-color: #7ba3e538;
+  box-shadow: inset 0 1px 0 #e2f2ff08;
+}
+.visual-effects-trigger:hover {
+  border-color: #89b9ef70;
+}
+.effects-floating {
+  position: fixed;
+  right: 24px;
+  bottom: 22px;
+  z-index: 38;
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border-color: #5e7fa94d;
+  background: #15243ce8;
+  backdrop-filter: blur(12px);
+  color: #bed5f7;
+  font-size: 10px;
+  box-shadow: 0 8px 30px #02081740;
+}
+.effects-dialog-symbol {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  color: #b4d4ff;
+  border: 1px solid #87b3ed4d;
+  background: linear-gradient(145deg, #31538c66, #192c4a);
+  margin: 0 0 20px;
+  box-shadow: 0 8px 26px #02091e29;
+}
+.effects-mode-options {
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  margin: 25px 0 18px;
+}
+.effects-visually-hidden,
+.effects-mode-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.effects-mode-option {
+  position: relative;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  cursor: pointer;
+  padding: 18px;
+  border: 1px solid #3b52716e;
+  border-radius: 13px;
+  background: #0c182b73;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.effects-mode-option:hover {
+  border-color: #789bd190;
+  background: #192d47;
+}
+.effects-mode-option:has(input:focus-visible) {
+  outline: 2px solid #b6d2ff;
+  outline-offset: 4px;
+}
+.effects-mode-option[data-checked="true"] {
+  background: linear-gradient(105deg, #27457380, #17253b);
+  border-color: #8cb8ef9c;
+  box-shadow: inset 0 1px 0 #cee5ff0c;
+}
+.effects-mode-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  width: 64px;
+  height: 64px;
+  border: 1px solid #8ca9e03b;
+  border-radius: 15px;
+  color: #b9ddff;
+  flex-shrink: 0;
+}
+.effects-preview-cinematic {
+  background:
+    radial-gradient(ellipse at 80% 0, #72d9ff44, transparent 75%),
+    linear-gradient(135deg, #345299, #1b2c55 60%, #41366d);
+  box-shadow:
+    inset 0 1px 0 #cfe7ff1f,
+    0 7px 17px #02091e25;
+}
+.effects-preview-cinematic::before {
+  content: "";
+  position: absolute;
+  inset: 10px -20px;
+  border: 1px solid #a2dbff50;
+  border-radius: 50%;
+  transform: rotate(-35deg);
+}
+.effects-preview-quiet {
+  background: linear-gradient(145deg, #283a56, #17253a);
+  color: #9fbedb;
+}
+.effects-mode-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.effects-mode-copy strong {
+  font-size: 14px;
+  font-weight: 650;
+  color: #e6f0ff;
+}
+.effects-mode-copy > span {
+  font-size: 11px;
+  color: #a1b7d5;
+  line-height: 1.7;
+}
+.effects-mode-check {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid #5a799f;
+  color: #cde5ff;
+  margin-left: auto;
+}
+.effects-mode-option[data-checked="true"] .effects-mode-check {
+  background: #6085d8;
+  border-color: #adcfff;
+  color: #fff;
+}
+.effects-preference-note {
+  color: #8fa9cd;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.operational-alert-anchor {
+  position: relative;
+}
+.operational-alert-anchor .notification-panel {
+  top: calc(100% + 14px);
+  right: 0;
+  width: min(340px, calc(100vw - 32px));
+}
+
+/* Quiet is local presentation preference; operating state is unaffected. */
+html[data-visual-mode="quiet"] .workspace-atmosphere > div,
+html[data-visual-mode="quiet"] .rivox-hero::after,
+html[data-visual-mode="quiet"] .rivox-hero .hero-orbit::before,
+html[data-visual-mode="quiet"] .rivox-hero .orbit-ring,
+html[data-visual-mode="quiet"] .rivox-hero .orbit-core,
+html[data-visual-mode="quiet"] .rivox-hero .orbit-core::before,
+html[data-visual-mode="quiet"] .rivox-hero .orbit-point,
+html[data-visual-mode="quiet"] .page-heading::after {
+  animation: none !important;
+}
+html[data-visual-mode="quiet"] .atmosphere-cursor-halo,
+html[data-visual-mode="quiet"] .rivox-hero::after,
+html[data-visual-mode="quiet"] .rivox-hero .orbit-core::before {
+  display: none;
+}
+html[data-visual-mode="quiet"] .rivox-hero .orbit-core {
+  transform: rotate(-8deg);
+}
+html[data-visual-mode="quiet"]
+  .page-content
+  :is(.data-panel, .metric-card, .report-option)::before,
+html[data-visual-mode="quiet"] .rivox-access .auth-panel::before {
+  opacity: 0 !important;
+}
+html[data-visual-mode="quiet"]
+  :is(
+    .metric-card,
+    .report-option,
+    .reply-option,
+    .role-profile-card,
+    .button,
+    .nav-link
+  ):hover {
+  transform: none !important;
+}
+@media (max-width: 520px) {
+  .topbar-avatar {
+    display: none;
+  }
+  .effects-floating {
+    right: 16px;
+    bottom: 16px;
+    padding: 10px 12px;
+  }
+  .effects-mode-option {
+    padding: 14px 12px;
+    gap: 12px;
+  }
+  .effects-mode-preview {
+    width: 49px;
+    height: 56px;
+    border-radius: 12px;
+  }
+  .effects-mode-copy strong {
+    font-size: 13px;
+  }
+  .effects-mode-copy > span {
+    font-size: 10px;
+  }
+}

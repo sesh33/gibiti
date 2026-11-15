@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import { useState } from "react";
 import { RoleProfiles, type RoleProfile } from "@/components/role-profiles";
 import { InventoryActions } from "@/components/inventory-actions";
@@ -256,7 +257,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
           <QueryError message={team.error.message} />
         ) : (
           <>
-            <div className="table-scroll">
+            <TableScroll label="Team directory">
               <table>
                 <thead>
                   <tr>
@@ -315,7 +316,7 @@ export function TeamModule({ configured }: { configured: boolean }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             {!team.data?.items.length && (
               <EmptyState
                 title="Built for a team. Secured for each person."
@@ -661,7 +662,7 @@ export function InventoryModule({ configured }: { configured: boolean }) {
           <QueryError message={inventory.error.message} />
         ) : (
           <>
-            <div className="table-scroll">
+            <TableScroll label="Inventory register">
               <table>
                 <thead>
                   <tr>
@@ -706,7 +707,7 @@ export function InventoryModule({ configured }: { configured: boolean }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             {!inventory.data?.items.length && (
               <EmptyState
                 title="A place for every digital product."
@@ -869,7 +870,7 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
           <QueryError message={approvals.error.message} />
         ) : (
           <>
-            <div className="table-scroll">
+            <TableScroll label="Approval requests">
               <table>
                 <thead>
                   <tr>
@@ -907,7 +908,7 @@ export function ApprovalsModule({ configured }: { configured: boolean }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             {!approvals.data?.items.length && (
               <EmptyState
                 title="No requests waiting for a second look."
@@ -1054,7 +1055,7 @@ export function OffersModule({ configured }: { configured: boolean }) {
           <QueryError message={offers.error.message} />
         ) : (
           <>
-            <div className="table-scroll">
+            <TableScroll label="Synchronized offers">
               <table>
                 <thead>
                   <tr>
@@ -1081,7 +1082,7 @@ export function OffersModule({ configured }: { configured: boolean }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             {!offers.data?.items.length && (
               <EmptyState
                 title="Your listings deserve a clearer workspace."
@@ -1138,7 +1139,7 @@ export function ActivityModule({ configured }: { configured: boolean }) {
           <QueryError message={activity.error.message} />
         ) : (
           <>
-            <div className="table-scroll">
+            <TableScroll label="Activity ledger">
               <table>
                 <thead>
                   <tr>
@@ -1169,7 +1170,7 @@ export function ActivityModule({ configured }: { configured: boolean }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             {!activity.data?.items.length && (
               <EmptyState
                 title="A trustworthy trail starts here."

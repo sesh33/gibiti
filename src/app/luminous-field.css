@@ -1,0 +1,45 @@
+/* A bounded optical field. Existing CSS auroras remain the unconditional fallback. */
+.workspace-atmosphere .atmosphere-aurora {
+  transition: opacity 1200ms ease;
+}
+.workspace-atmosphere > .luminous-field {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  transition: opacity 1000ms ease;
+}
+.luminous-field canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.luminous-field[data-renderer="webgl"] {
+  opacity: 0.67;
+}
+.workspace-atmosphere:has(.luminous-field[data-renderer="webgl"])
+  .atmosphere-aurora {
+  opacity: 0.65;
+}
+.workspace-atmosphere .atmosphere-cursor-halo {
+  z-index: 2;
+}
+.workspace-atmosphere .atmosphere-vignette {
+  z-index: 3;
+}
+html[data-visual-mode="quiet"] .luminous-field {
+  display: none;
+}
+@media (max-width: 820px),
+  (hover: none),
+  (pointer: coarse),
+  (prefers-reduced-motion: reduce),
+  (forced-colors: active) {
+  .workspace-atmosphere > .luminous-field {
+    display: none;
+  }
+}

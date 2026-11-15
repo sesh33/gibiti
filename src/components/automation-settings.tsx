@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -360,7 +361,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
           workspace switch can run them.
         </p>
         {policies.isError && <p role="alert">{policies.error.message}</p>}
-        <div className="table-scroll">
+        <TableScroll label="Saved pricing rules">
           <table>
             <thead>
               <tr>
@@ -403,7 +404,7 @@ export function AutomationSettings({ configured }: { configured: boolean }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
         {!policies.data?.items.length && (
           <p className="scope-note">
             No saved rules are displayed. Nothing is automatically repriced.

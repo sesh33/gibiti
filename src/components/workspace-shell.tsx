@@ -11,6 +11,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { workspaceBrand } from "@/lib/branding";
 import { WorkspaceTransition } from "@/components/workspace-transition";
+import { VisualEffectsControl } from "@/components/visual-effects-control";
+import { OperationalAlerts } from "@/components/operational-alerts";
 import {
   Activity,
   FileSpreadsheet,
@@ -159,7 +161,6 @@ export function WorkspaceShell({
     queryClient = useQueryClient();
   const [searchOpen, setSearchOpen] = useState(false),
     [query, setQuery] = useState(""),
-    [notifications, setNotifications] = useState(false),
     [loggingOut, setLoggingOut] = useState(false),
     [logoutError, setLogoutError] = useState(""),
     [mobileOpen, setMobileOpen] = useState(false);
@@ -193,11 +194,15 @@ export function WorkspaceShell({
     function keyboard(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
+        const dialog = document.querySelector(
+          '[role="dialog"][data-state="open"]',
+        );
+        if (dialog && !dialog.querySelector('[aria-label="Search workspace"]'))
+          return;
         setMobileOpen(false);
         setSearchOpen((value) => !value);
       }
       if (event.key === "Escape") {
-        setNotifications(false);
         setMobileOpen(false);
       }
     }
@@ -478,6 +483,7 @@ export function WorkspaceShell({
             </div>
           </div>
           <div className="topbar-actions">
+            <VisualEffectsControl />
             <button
               className="global-search"
               aria-label="Open command search"
@@ -488,15 +494,11 @@ export function WorkspaceShell({
               <kbd>⌘ K</kbd>
             </button>
             <span className="topbar-divider" />
-            <button
-              className="icon-button"
-              aria-label="Operational alerts"
-              aria-expanded={notifications}
-              aria-controls="operational-alerts"
-              onClick={() => setNotifications((value) => !value)}
-            >
-              <Bell size={17} />
-            </button>
+            <OperationalAlerts
+              key={pathname}
+              configured={configured}
+              canManageSettings={canManageSettings}
+            />
             <span
               className="topbar-avatar"
               aria-label={staff ? `${staff.name} profile` : "Workspace setup"}
@@ -504,30 +506,6 @@ export function WorkspaceShell({
               {initials}
             </span>
           </div>
-          {notifications && (
-            <div
-              id="operational-alerts"
-              className="notification-panel"
-              role="region"
-              aria-label="Operational alerts"
-            >
-              <strong>Operational alerts</strong>
-              <p>Buyer messaging is not included in the Eldorado Seller API.</p>
-              {!configured && (
-                <p>Configure Supabase before inviting your team.</p>
-              )}
-              {canManageSettings ? (
-                <Link href="/settings" onClick={() => setNotifications(false)}>
-                  View integration status <ArrowUpRight size={12} />
-                </Link>
-              ) : (
-                <p>
-                  Your Owner manages integration access. Your staff permissions
-                  remain in effect.
-                </p>
-              )}
-            </div>
-          )}
         </header>
         {!configured && (
           <div className="setup-banner">

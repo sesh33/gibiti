@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -283,7 +284,7 @@ export function OrderCenter({ configured }: { configured: boolean }) {
           <div className="skeleton-panel" />
         ) : (
           <>
-            <div className="table-scroll">
+            <TableScroll label="Synchronized orders">
               <table>
                 <thead>
                   <tr>
@@ -349,7 +350,7 @@ export function OrderCenter({ configured }: { configured: boolean }) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableScroll>
             {!orders.data?.items.length && (
               <EmptyState
                 title="Your operation starts with the first sync."

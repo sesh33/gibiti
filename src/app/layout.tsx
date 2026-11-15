@@ -9,9 +9,16 @@ import "./atmosphere.css";
 import "./cinematic-interactions.css";
 import "./route-motion.css";
 import "./depth-surfaces.css";
+import "./luminous-field.css";
+import "./optical-surfaces.css";
+import "./table-scroll.css";
+import "./detail-refinements.css";
+import "./visual-effects-preferences.css";
 import { Providers } from "./providers";
 import { workspaceBrand } from "@/lib/branding";
 import { WorkspaceAtmosphere } from "@/components/workspace-atmosphere";
+import { OpticalSurfaces } from "@/components/optical-surfaces";
+import { PublicVisualEffectsControl } from "@/components/visual-effects-control";
 export const metadata: Metadata = {
   title: {
     default: `${workspaceBrand.name} Control`,
@@ -30,6 +37,8 @@ export default function RootLayout({
       >
         <Providers>
           <WorkspaceAtmosphere />
+          <OpticalSurfaces />
+          <PublicVisualEffectsControl />
           {children}
         </Providers>
       </body>

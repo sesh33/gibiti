@@ -1,4 +1,5 @@
 "use client";
+import { TableScroll } from "@/components/table-scroll";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -134,7 +135,7 @@ export function Overview({ configured }: { configured: boolean }) {
             <h2>States reported by Eldorado</h2>
             <span className="pill pill-muted">Exact labels</span>
           </div>
-          <div className="table-scroll">
+          <TableScroll label="Synchronized order states">
             <table>
               <thead>
                 <tr>
@@ -170,7 +171,7 @@ export function Overview({ configured }: { configured: boolean }) {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
           <p className="scope-note" style={{ margin: "14px 18px" }}>
             Received confirms delivery, not released funds or Completed volume.{" "}
             Unclassified labels are preserved exactly. They are not counted as

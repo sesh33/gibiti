@@ -85,7 +85,14 @@ export function WorkspaceHero({ configured }: { configured: boolean }) {
           </span>
         </div>
       </div>
-      <div className="hero-orbit" aria-hidden="true">
+      <div className="hero-orbit optical-orbit" aria-hidden="true">
+        <div className="optical-sculpture">
+          <span className="optical-glass-plane optical-plane-back" />
+          <span className="optical-glass-plane optical-plane-middle" />
+          <span className="optical-glass-plane optical-plane-front" />
+          <span className="optical-reticle" />
+          <span className="optical-sculpture-axis" />
+        </div>
         <span className="hero-coordinate hero-coordinate-top">
           FOCUS / CONTROL / MOMENTUM
         </span>
